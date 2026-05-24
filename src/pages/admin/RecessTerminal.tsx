@@ -202,9 +202,9 @@ const RecessTerminal: React.FC = () => {
       const isSchoolStudent = c.zone === 'Colegio San Martin' || c.id.startsWith('student_') || c.id.startsWith('teacher_');
       if (!isSchoolStudent) return false;
       return (
-        c.name.toLowerCase().includes(term) ||
-        c.fantasy_name.toLowerCase().includes(term) ||
-        (c.credential_id && c.credential_id.toLowerCase().includes(term))
+        (c.name || '').toLowerCase().includes(term) ||
+        (c.fantasy_name || '').toLowerCase().includes(term) ||
+        (c.credential_id || '').toLowerCase().includes(term)
       );
     });
   }, [clients, checkoutStudentSearchQuery]);
@@ -309,9 +309,9 @@ const RecessTerminal: React.FC = () => {
       const isSchoolStudent = c.zone === 'Colegio San Martin' || c.id.startsWith('student_') || c.id.startsWith('teacher_');
       if (!isSchoolStudent) return false;
       return (
-        c.name.toLowerCase().includes(term) ||
-        c.fantasy_name.toLowerCase().includes(term) ||
-        (c.credential_id && c.credential_id.toLowerCase().includes(term))
+        (c.name || '').toLowerCase().includes(term) ||
+        (c.fantasy_name || '').toLowerCase().includes(term) ||
+        (c.credential_id || '').toLowerCase().includes(term)
       );
     });
   }, [clients, studentSearchQuery]);
