@@ -1,0 +1,133 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@600;700;800&family=Poppins:wght@300;400;500;600&family=Bebas+Neue&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-brand-black: #0B0B0B;
+  --color-brand-graphite: #1A1A1A;
+  --color-brand-charcoal: #2B2B2B;
+  --color-brand-steel: #6E6E6E;
+  --color-brand-white: #FFFFFF;
+  --color-brand-smoke: #F5F5F5;
+  --color-brand-wine: #5A0F1B;
+  --color-brand-crimson: #7A1E2C;
+  --color-brand-gold: #C8A45D;
+
+  --font-sans: "Inter", "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Montserrat", "Poppins", sans-serif;
+  --font-accent: "Bebas Neue", sans-serif;
+
+  --animate-fade-in: fadeIn 0.3s ease-out;
+  --animate-slide-up: slideUp 0.4s ease-out;
+  --animate-scale-up: scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes slideUp {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes scaleUp {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-brand-black text-brand-smoke font-sans selection:bg-brand-wine selection:text-white;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-brand-graphite/80 backdrop-blur-md border border-brand-charcoal rounded-xl;
+  }
+
+  .btn-primary {
+    @apply bg-brand-wine hover:bg-brand-crimson text-white px-6 py-2 rounded-lg font-medium transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-secondary {
+    @apply bg-brand-charcoal hover:bg-brand-steel/20 text-brand-smoke px-6 py-2 rounded-lg font-medium border border-brand-steel/30 transition-all active:scale-95;
+  }
+
+  .btn-gold {
+    @apply bg-brand-gold hover:bg-brand-gold/90 text-brand-black px-6 py-2 rounded-lg font-bold transition-all active:scale-95;
+  }
+
+  .input-field {
+    @apply bg-brand-charcoal border border-brand-steel/30 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand-wine focus:border-transparent outline-none transition-all placeholder:text-brand-steel;
+  }
+
+  .table-row-hover {
+    @apply hover:bg-brand-charcoal/50 transition-colors cursor-pointer;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-brand-black;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-brand-charcoal rounded-full hover:bg-brand-steel transition-colors;
+}
+
+@media print {
+  body {
+    background-color: white !important;
+  }
+
+  /* El contenido dentro del iframe de react-to-print usará esta clase */
+  .print-mode-ticket {
+    margin: 0 !important;
+    padding: 20px !important;
+    background-color: white !important;
+    color: black !important;
+  }
+
+  .print-mode-ticket * {
+    background-color: transparent !important;
+    color: black !important;
+    box-shadow: none !important;
+    border-color: #ccc !important;
+  }
+
+  /* Columnas para ítems (Mitad izquierda y mitad derecha) */
+  #printable-items {
+    column-count: 2 !important;
+    column-gap: 40px !important;
+    column-fill: auto !important;
+    margin-top: 10px !important;
+  }
+
+  #printable-items > div {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 12px !important;
+  }
+}
+
+/* Mejora de contraste para dropdowns (combos) */
+select option {
+  background-color: #1A1A1A !important;
+  color: #F5F5F5 !important;
+}
+select option:hover, select option:focus, select option:active {
+  background-color: #5A0F1B !important;
+  color: #FFFFFF !important;
+}
+select {
+  color-scheme: dark;
+}
