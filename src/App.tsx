@@ -31,6 +31,17 @@ function App() {
   useEffect(() => {
     // Hydrate local Zustand store with latest data from Supabase if online
     SupabaseSyncService.syncAll();
+
+    // Automatically sync when connection is restored
+    const handleOnline = () => {
+      console.log('Internet connection restored. Synchronizing...');
+      SupabaseSyncService.syncAll();
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
   }, []);
 
   return (
