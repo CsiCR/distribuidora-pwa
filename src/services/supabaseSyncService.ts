@@ -334,5 +334,34 @@ export const SupabaseSyncService = {
       console.error('Error uploading local cache to Supabase:', e);
       return false;
     }
+  },
+
+  // Clear all remote tables in Supabase (used when resetting database via Demo Manager)
+  async clearAllSupabaseData(): Promise<boolean> {
+    try {
+      const isConnected = await this.checkConnection();
+      if (!isConnected) return false;
+
+      console.log('Clearing all remote data from Supabase...');
+      
+      // Delete all records from each table
+      await supabase.from('order_items').delete().neq('id', '_dummy_');
+      await supabase.from('orders').delete().neq('id', '_dummy_');
+      await supabase.from('transactions').delete().neq('id', '_dummy_');
+      await supabase.from('stock_audit_logs').delete().neq('id', '_dummy_');
+      await supabase.from('provider_invoice_items').delete().neq('id', '_dummy_');
+      await supabase.from('provider_invoices').delete().neq('id', '_dummy_');
+      await supabase.from('provider_payments').delete().neq('id', '_dummy_');
+      await supabase.from('products').delete().neq('id', '_dummy_');
+      await supabase.from('clients').delete().neq('id', '_dummy_');
+      await supabase.from('providers').delete().neq('id', '_dummy_');
+      await supabase.from('settings').delete().neq('id', '_dummy_');
+      
+      console.log('All remote data cleared successfully.');
+      return true;
+    } catch (e) {
+      console.error('Error clearing remote Supabase data:', e);
+      return false;
+    }
   }
 };

@@ -13,6 +13,7 @@ import { useCartStore } from '../../store/useCartStore';
 import { seedProfiles } from '../../data/seedProfiles';
 import { cn } from '../../lib/utils';
 import { generateDemoData } from '../../utils/demoDataGenerator';
+import { SupabaseSyncService } from '../../services/supabaseSyncService';
 
 export const DemoManager: React.FC = () => {
   const location = useLocation();
@@ -35,8 +36,12 @@ export const DemoManager: React.FC = () => {
   const setDistributorName = useSettingsStore(state => state.setDistributorName);
   const [tempName, setTempName] = useState(distributorName);
 
-  const handleResetAll = () => {
-    if (window.confirm('¿Está seguro de borrar TODOS los datos? Se eliminarán pedidos, clientes, stock, proveedores, transacciones y carrito.')) {
+  const handleResetAll = async () => {
+    if (window.confirm('¿Está seguro de borrar TODOS los datos? Se eliminarán pedidos, clientes, stock, proveedores, transacciones y carrito en local y en Supabase.')) {
+      // 1. Clear Supabase
+      await SupabaseSyncService.clearAllSupabaseData();
+      
+      // 2. Clear Local Stores
       clearStore();
       clearOrders();
       clearClients();
@@ -45,14 +50,18 @@ export const DemoManager: React.FC = () => {
       clearTerminal();
       clearProviders();
       clearCart();
-      alert('Sistema reiniciado a cero.');
+      alert('Sistema reiniciado a cero en local y en Supabase.');
     }
   };
 
-  const handleSeed = (type: keyof typeof seedProfiles) => {
+  const handleSeed = async (type: keyof typeof seedProfiles) => {
     const profile = seedProfiles[type];
     const demoData = generateDemoData(profile.products);
 
+    // 1. Clear Supabase
+    await SupabaseSyncService.clearAllSupabaseData();
+
+    // 2. Clear Local Stores
     clearStore();
     clearOrders();
     clearClients();
@@ -62,14 +71,18 @@ export const DemoManager: React.FC = () => {
     clearProviders();
     clearCart();
     
+    // 3. Hydrate Local Stores with Seed Data
     setProducts(demoData.products);
     setClients(demoData.clients);
     setProvidersData(demoData.providers, demoData.providerInvoices, demoData.providerPayments);
     setOrders(demoData.orders);
     setTransactions(demoData.transactions);
 
+    // 4. Batch Upload Seed Data to Supabase
+    await SupabaseSyncService.pushAllLocalData();
+
     setIsOpen(false);
-    alert(`Cargado perfil de demostración: ${profile.name} con 5 días de movimientos.`);
+    alert(`Cargado perfil de demostración: ${profile.name} con 5 días de movimientos en local y Supabase.`);
   };
 
   const handleNameChange = () => {
