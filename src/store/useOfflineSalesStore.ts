@@ -33,9 +33,12 @@ interface OfflineSalesState {
   offlineOrders: OfflineOrder[];
   activeCarts: OfflineCart[];
   activeCartId: string;
+  supabaseStatus: 'connected' | 'disconnected' | 'missing_credentials' | 'connecting';
+  supabaseError: string | null;
   
   toggleOfflineMode: () => void;
   setOfflineMode: (val: boolean) => void;
+  setSupabaseStatus: (status: 'connected' | 'disconnected' | 'missing_credentials' | 'connecting', error?: string | null) => void;
   
   addCartQueue: (name?: string) => string;
   removeCartQueue: (id: string) => void;
@@ -67,9 +70,12 @@ export const useOfflineSalesStore = create<OfflineSalesState>()(
         { id: '1', name: 'Cola 1', items: [], selectedClientId: undefined }
       ],
       activeCartId: '1',
+      supabaseStatus: 'connecting',
+      supabaseError: null,
       
       toggleOfflineMode: () => set((state) => ({ isOfflineMode: !state.isOfflineMode })),
       setOfflineMode: (val) => set({ isOfflineMode: val }),
+      setSupabaseStatus: (status, error = null) => set({ supabaseStatus: status, supabaseError: error }),
       
       addCartQueue: (name) => {
         const id = 'cart_' + Date.now();
@@ -339,6 +345,12 @@ export const useOfflineSalesStore = create<OfflineSalesState>()(
     }),
     {
       name: 'recess-sales-storage',
+      partialize: (state) => ({
+        isOfflineMode: state.isOfflineMode,
+        offlineOrders: state.offlineOrders,
+        activeCarts: state.activeCarts,
+        activeCartId: state.activeCartId,
+      }),
     }
   )
 );

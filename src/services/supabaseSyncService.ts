@@ -5,6 +5,7 @@ import { useOrdersStore } from '../store/useOrdersStore';
 import { useTransactionsStore } from '../store/useTransactionsStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useProvidersStore } from '../store/useProvidersStore';
+import { useOfflineSalesStore } from '../store/useOfflineSalesStore';
 import {
   mapDbProductToApp,
   mapAppProductToDb,
@@ -17,17 +18,32 @@ import {
 export const SupabaseSyncService = {
   // Check if we can connect to Supabase
   async checkConnection(): Promise<boolean> {
+    const setStatus = useOfflineSalesStore.getState().setSupabaseStatus;
+    
+    // Check if credentials are placeholders or undefined
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder') || supabaseAnonKey.includes('placeholder')) {
+      setStatus('missing_credentials', 'Faltan configurar las variables de entorno VITE_SUPABASE_URL y/o VITE_SUPABASE_ANON_KEY en Vercel.');
+      return false;
+    }
+
     try {
+      setStatus('connecting');
       const { error } = await supabase.from('settings').select('id').limit(1);
       if (error) {
         // If table settings is missing (not run schema yet), but we can still connect
         if (error.code === 'PGRST116' || error.code === '42P01') {
+          setStatus('connected', null);
           return true; // Connection works, table just not initialized yet
         }
+        setStatus('disconnected', error.message);
         return false;
       }
+      setStatus('connected', null);
       return true;
-    } catch {
+    } catch (e: any) {
+      setStatus('disconnected', e?.message || 'Error de conexión a internet');
       return false;
     }
   },

@@ -24,6 +24,8 @@ import { useOfflineSalesStore } from '../../store/useOfflineSalesStore';
 import { useStockStore } from '../../store/useStockStore';
 import { useClientsStore, type Client } from '../../store/useClientsStore';
 import { cn } from '../../lib/utils';
+import { SupabaseSyncService } from '../../services/supabaseSyncService';
+
 
 const RecessTerminal: React.FC = () => {
   const {
@@ -41,7 +43,9 @@ const RecessTerminal: React.FC = () => {
     updateCartQty,
     removeFromCart,
     processOfflineSale,
-    syncPendingSales
+    syncPendingSales,
+    supabaseStatus,
+    supabaseError
   } = useOfflineSalesStore();
 
   const { products } = useStockStore();
@@ -131,6 +135,7 @@ const RecessTerminal: React.FC = () => {
   }, [clients, activeCartId]);
 
   // Syncing simulation
+  // Syncing action
   const handleSyncClick = async () => {
     if (isOfflineMode) {
       triggerNotification('Activa la señal (Online) para poder sincronizar.', 'error');
@@ -138,16 +143,27 @@ const RecessTerminal: React.FC = () => {
     }
     setIsSyncing(true);
     try {
-      // Simulate network request
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const count = await syncPendingSales();
-      if (count > 0) {
-        triggerNotification(`¡Sincronización completada! ${count} venta(s) cargadas al servidor.`, 'success');
-      } else {
-        triggerNotification('No hay ventas pendientes por sincronizar.', 'info');
+      // 1. Check/retry Supabase connection first
+      const connectionSuccess = await SupabaseSyncService.checkConnection();
+      if (!connectionSuccess) {
+        const errorMsg = useOfflineSalesStore.getState().supabaseError || 'No se pudo conectar a la base de datos central.';
+        triggerNotification(`Error de conexión: ${errorMsg}`, 'error');
+        return;
       }
-    } catch (e) {
-      triggerNotification('Error al conectar con el servidor central.', 'error');
+
+      // 2. Sync pending sales (this will push and trigger syncAll)
+      const count = await syncPendingSales();
+      
+      // 3. Hydrate store one extra time to fetch any external updates
+      await SupabaseSyncService.syncAll();
+      
+      if (count > 0) {
+        triggerNotification(`¡Sincronización completada! ${count} venta(s) cargadas al servidor y catálogo actualizado.`, 'success');
+      } else {
+        triggerNotification('¡Base de datos y catálogo sincronizados con la nube!', 'success');
+      }
+    } catch (e: any) {
+      triggerNotification(`Error de red: ${e?.message || 'Error de conexión'}`, 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -494,27 +510,56 @@ const RecessTerminal: React.FC = () => {
             </Link>
           </div>
           
-          <button 
-            onClick={toggleOfflineMode}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-colors cursor-pointer border",
-              isOfflineMode 
-                ? "bg-rose-500/10 text-rose-400 border-rose-500/30" 
-                : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-            )}
-          >
-            {isOfflineMode ? (
-              <>
-                <WifiOff size={14} className="animate-pulse" />
-                Desconectado (Local)
-              </>
-            ) : (
-              <>
-                <Wifi size={14} />
-                Señal Activa (Online)
-              </>
-            )}
-          </button>
+          {/* Real-time Supabase connection status / Offline manual switch */}
+          {isOfflineMode ? (
+            <button 
+              onClick={toggleOfflineMode}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/30 cursor-pointer hover:bg-rose-500/20 transition-colors"
+              title="El sistema está configurado en modo local manual offline."
+            >
+              <WifiOff size={14} className="animate-pulse" />
+              Modo Local Manual
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              {supabaseStatus === 'connected' && (
+                <button 
+                  onClick={toggleOfflineMode}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 cursor-pointer hover:bg-emerald-500/20 transition-colors"
+                  title="Conectado a la nube. Toca para desactivar la señal (modo local)."
+                >
+                  <Wifi size={14} />
+                  Nube Conectada
+                </button>
+              )}
+              {supabaseStatus === 'connecting' && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 animate-pulse">
+                  <RotateCw size={12} className="animate-spin" />
+                  Conectando...
+                </div>
+              )}
+              {supabaseStatus === 'disconnected' && (
+                <button 
+                  onClick={() => handleSyncClick()}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/30 cursor-pointer hover:bg-rose-500/20 transition-colors"
+                  title={`Error al conectar con la base de datos: ${supabaseError || 'Error de red'}. Toca para reintentar.`}
+                >
+                  <WifiOff size={14} />
+                  Error Nube (Reintentar)
+                </button>
+              )}
+              {supabaseStatus === 'missing_credentials' && (
+                <button 
+                  onClick={() => alert(`Variables de entorno VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY no configuradas en Vercel.\n\nPara solucionarlo:\n1. Ve a tu proyecto en Vercel -> Settings -> Environment Variables\n2. Agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY con sus respectivos valores\n3. Redespliega la aplicación.`)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/15 text-rose-300 border border-rose-500/40 cursor-pointer hover:bg-rose-500/20 transition-colors"
+                  title="Las variables de entorno de Supabase no están configuradas en Vercel. Toca para ver instrucciones."
+                >
+                  <AlertTriangle size={14} className="text-rose-400 animate-bounce" />
+                  Nube sin Configurar
+                </button>
+              )}
+            </div>
+          )}
 
           <button 
             onClick={handleSyncClick}
