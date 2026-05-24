@@ -288,14 +288,21 @@ const RecessTerminal: React.FC = () => {
     );
   };
 
-  // School Recess Categories List
-  const categories = ['Todos', 'Alfajores', 'Bebidas', 'Snacks', 'Golosinas'];
+  // Dynamically compute categories based on actual active products
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    products.forEach(p => {
+      if (p.status === 'activo' && p.category) {
+        cats.add(p.category);
+      }
+    });
+    return ['Todos', ...Array.from(cats)];
+  }, [products]);
 
   // Filter products for school quick canteen
   const schoolProducts = useMemo(() => {
     return products.filter(p => {
-      const isCanteenCategory = ['Alfajores', 'Bebidas', 'Snacks', 'Golosinas'].includes(p.category) || p.id.startsWith('sch_');
-      if (!isCanteenCategory || p.status === 'inactivo') return false;
+      if (p.status === 'inactivo') return false;
       if (activeCategory === 'Todos') return true;
       return p.category === activeCategory;
     });
