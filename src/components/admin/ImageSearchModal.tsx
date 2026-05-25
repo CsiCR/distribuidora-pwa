@@ -8,7 +8,8 @@ import {
   Trash2, 
   AlertCircle, 
   Check, 
-  Loader2 
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 
 interface ImageSearchModalProps {
@@ -40,7 +41,11 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
   const [processingStatus, setProcessingStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [customImageUrl, setCustomImageUrl] = useState('');
-  const [activeTab, setActiveTab] = useState<'search' | 'upload' | 'url'>('search');
+  const [activeTab, setActiveTab] = useState<'search' | 'upload' | 'url' | 'ia'>('search');
+  const [iaPrompt, setIaPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
+  const [isRealMode, setIsRealMode] = useState(() => localStorage.getItem('copilot_mode') === 'real');
 
   // Clean product name to remove sizes, units, barcodes, etc. for better search accuracy
   const cleanProductName = (name: string): string => {
@@ -205,12 +210,20 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
     setIsLoading(false);
   };
 
-  // Initialize query on open
+  // Load API config and prefill prompt when opening
   useEffect(() => {
-    if (isOpen && productName) {
-      const cleaned = cleanProductName(productName);
-      setSearchQuery(cleaned);
-      performSearch(cleaned);
+    if (isOpen) {
+      setApiKey(localStorage.getItem('gemini_api_key') || '');
+      setIsRealMode(localStorage.getItem('copilot_mode') === 'real');
+      
+      if (productName) {
+        const cleaned = cleanProductName(productName);
+        setSearchQuery(cleaned);
+        performSearch(cleaned);
+        
+        // A commercial professional studio style product image prompt
+        setIaPrompt(`Fotografía profesional de estudio comercial de ${productName}, iluminación de estudio, fondo blanco limpio de catálogo, enfoque nítido, alta resolución, centrado.`);
+      }
       setCustomImageUrl(currentImageUrl || '');
     }
   }, [isOpen, productName, currentImageUrl]);
@@ -363,6 +376,120 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
     reader.readAsDataURL(file);
   };
 
+  // Helper to convert base64 image data to optimized WebP base64 via Canvas
+  const convertBase64ToWebp = (base64Data: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        const MAX_SIZE = 800;
+        if (width > MAX_SIZE || height > MAX_SIZE) {
+          if (width > height) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          } else {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const webpDataUrl = canvas.toDataURL('image/webp', 0.8);
+          resolve(webpDataUrl);
+        } else {
+          reject(new Error('No se pudo inicializar el contexto del canvas en 2D.'));
+        }
+      };
+
+      img.onerror = () => {
+        reject(new Error('La imagen generada no tiene un formato válido para procesar.'));
+      };
+
+      img.src = base64Data;
+    });
+  };
+
+  // Call the Imagen 3 API using the user's Gemini key
+  const handleGenerateAI = async () => {
+    if (!iaPrompt.trim()) return;
+    if (!apiKey) {
+      setError('Clave de API de Gemini no configurada.');
+      return;
+    }
+
+    setIsGenerating(true);
+    setProcessingStatus('Generando imagen con IA (Imagen 3)...');
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          instances: [
+            {
+              prompt: iaPrompt
+            }
+          ],
+          parameters: {
+            sampleCount: 1,
+            aspectRatio: '1:1',
+            outputMimeType: 'image/jpeg'
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Gemini Imagen 3 API Error:', errorText);
+        throw new Error(`Error de API (${response.status}): ${errorText || response.statusText}`);
+      }
+
+      const data = await response.json();
+      const base64Bytes = data.predictions?.[0]?.bytesBase64Encoded;
+      const mimeType = data.predictions?.[0]?.mimeType || 'image/jpeg';
+
+      if (!base64Bytes) {
+        throw new Error('La respuesta de la API no contiene la imagen generada.');
+      }
+
+      const dataUrl = `data:${mimeType};base64,${base64Bytes}`;
+      setProcessingStatus('Optimizando y convirtiendo imagen generada a WebP...');
+      const webpUrl = await convertBase64ToWebp(dataUrl);
+
+      onSelectImage(webpUrl);
+      onClose();
+    } catch (err: any) {
+      console.error('Error generating AI image:', err);
+      let displayError = err.message || 'Error de conexión con la API.';
+      if (displayError.includes('{')) {
+        try {
+          const jsonStart = displayError.indexOf('{');
+          const errorJson = JSON.parse(displayError.substring(jsonStart));
+          if (errorJson.error?.message) {
+            displayError = errorJson.error.message;
+          }
+        } catch (e) {}
+      }
+      setError(`Error al generar con IA: ${displayError}`);
+    } finally {
+      setIsGenerating(false);
+      setIsProcessing(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -388,39 +515,57 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-brand-charcoal bg-brand-charcoal/10">
+        <div className="flex border-b border-brand-charcoal bg-brand-charcoal/10 overflow-x-auto scrollbar-none">
           <button
             type="button"
             onClick={() => setActiveTab('search')}
-            className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+            className={`flex-1 min-w-[80px] py-3 text-center text-[10px] sm:text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
               activeTab === 'search'
                 ? 'border-brand-gold text-brand-gold bg-brand-gold/5'
                 : 'border-transparent text-brand-steel hover:text-brand-smoke'
             }`}
           >
-            Buscar en la Web
+            <Search size={12} className="sm:w-3.5 sm:h-3.5" />
+            <span className="hidden xs:inline">Buscar Web</span>
+            <span className="xs:hidden">Buscar</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('upload')}
-            className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+            className={`flex-1 min-w-[80px] py-3 text-center text-[10px] sm:text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
               activeTab === 'upload'
                 ? 'border-brand-gold text-brand-gold bg-brand-gold/5'
                 : 'border-transparent text-brand-steel hover:text-brand-smoke'
             }`}
           >
-            Cargar Foto Local
+            <Upload size={12} className="sm:w-3.5 sm:h-3.5" />
+            <span className="hidden xs:inline">Foto Local</span>
+            <span className="xs:hidden">Subir</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('url')}
-            className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+            className={`flex-1 min-w-[80px] py-3 text-center text-[10px] sm:text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
               activeTab === 'url'
                 ? 'border-brand-gold text-brand-gold bg-brand-gold/5'
                 : 'border-transparent text-brand-steel hover:text-brand-smoke'
             }`}
           >
-            Pegar URL Directa
+            <Globe size={12} className="sm:w-3.5 sm:h-3.5" />
+            <span className="hidden xs:inline">Pegar URL</span>
+            <span className="xs:hidden">URL</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('ia')}
+            className={`flex-1 min-w-[90px] py-3 text-center text-[10px] sm:text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              activeTab === 'ia'
+                ? 'border-brand-gold text-brand-gold bg-brand-gold/5'
+                : 'border-transparent text-brand-steel hover:text-brand-smoke'
+            }`}
+          >
+            <Sparkles size={12} className="sm:w-3.5 sm:h-3.5 text-brand-gold/80" />
+            <span>Generar con IA</span>
           </button>
         </div>
 
@@ -610,6 +755,83 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
                 <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl flex items-center gap-3 text-rose-400 text-xs">
                   <AlertCircle size={16} />
                   <p>{error}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Active Tab: AI Image Generation */}
+          {activeTab === 'ia' && (
+            <div className="space-y-6 py-2">
+              {!isRealMode || !apiKey ? (
+                <div className="bg-brand-charcoal/20 border border-brand-gold/20 p-6 rounded-2xl space-y-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="text-brand-gold mt-0.5 flex-shrink-0" size={18} />
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-black text-brand-smoke uppercase tracking-wider">
+                        API de Gemini / Modo Real no configurado
+                      </h4>
+                      <p className="text-[10px] text-brand-steel leading-relaxed">
+                        Para generar imágenes realistas de tus productos utilizando la inteligencia artificial de Google (Imagen 3), debes configurar la API Key de Gemini y activar el switch de <strong>"API Real"</strong> en el panel de control del Copiloto.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="bg-brand-black/40 border border-brand-charcoal p-3.5 rounded-xl space-y-2">
+                    <p className="text-[10px] text-brand-smoke font-bold uppercase tracking-wide">¿Cómo configurarlo?</p>
+                    <ol className="list-decimal list-inside text-[9px] text-brand-steel space-y-1">
+                      <li>Cierra este modal temporalmente.</li>
+                      <li>Haz clic en el switch de <strong className="text-brand-gold">Modo Simulado / Real</strong> en la barra de control superior del Copiloto.</li>
+                      <li>Introduce tu API Key de Gemini (puedes crear una gratis en Google AI Studio).</li>
+                      <li>Regresa aquí y verás habilitada la generación por IA de inmediato.</li>
+                    </ol>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-brand-steel uppercase tracking-widest block">
+                      Descripción para la Generación de Imagen (Prompt)
+                    </label>
+                    <textarea
+                      value={iaPrompt}
+                      onChange={(e) => setIaPrompt(e.target.value)}
+                      placeholder="Ej. Resma de papel A4 marca Boreal 75gr, empaque color azul, fondo de estudio fotográfico..."
+                      rows={4}
+                      className="w-full bg-brand-charcoal/20 border border-brand-charcoal focus:border-brand-gold rounded-xl px-4 py-3 text-xs text-brand-smoke focus:outline-none transition-all resize-none leading-relaxed"
+                      disabled={isGenerating}
+                    />
+                    <p className="text-[10px] text-brand-steel leading-normal">
+                      Consejo: Cuanto más detallado sea el prompt, más precisa será la imagen. Describe el empaque, colores principales y el estilo del fondo.
+                    </p>
+                  </div>
+
+                  {error && (
+                    <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl flex items-center gap-3 text-rose-400 text-xs">
+                      <AlertCircle size={16} className="flex-shrink-0" />
+                      <p>{error}</p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      disabled={isGenerating || !iaPrompt.trim()}
+                      onClick={handleGenerateAI}
+                      className="w-full bg-brand-gold hover:bg-brand-gold/90 text-brand-black font-black uppercase text-xs tracking-wider py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="animate-spin" size={16} />
+                          <span>Generando con Gemini...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={16} />
+                          <span>Generar Foto de Producto con IA</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
