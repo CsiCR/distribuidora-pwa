@@ -874,25 +874,27 @@ const RecessTerminal: React.FC = () => {
                 </div>
                 
                 {/* Search Fallback */}
-                <div className="w-full relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-steel" size={16} />
-                  <input
-                    type="text"
-                    inputMode="none"
-                    placeholder="Búsqueda manual de alumno/curso..."
-                    className="w-full input-field pl-9 py-1.5 text-xs"
-                    value={studentSearchQuery}
-                    onChange={(e) => {
-                      setStudentSearchQuery(e.target.value);
-                      setShowSearchDropdown(true);
-                    }}
-                    onFocus={() => setShowSearchDropdown(true)}
-                  />
+                <div className="w-full relative flex flex-col gap-2">
+                  <div className="relative w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-steel" size={16} />
+                    <input
+                      type="text"
+                      inputMode="none"
+                      placeholder="Búsqueda manual de alumno/curso..."
+                      className="w-full input-field pl-9 py-1.5 text-xs"
+                      value={studentSearchQuery}
+                      onChange={(e) => {
+                        setStudentSearchQuery(e.target.value);
+                        setShowSearchDropdown(true);
+                      }}
+                      onFocus={() => setShowSearchDropdown(true)}
+                    />
+                  </div>
                   
                   {showSearchDropdown && renderVirtualQwertyKeyboard(studentSearchQuery, setStudentSearchQuery, setShowSearchDropdown)}
                   
                   {showSearchDropdown && filteredStudentsSuggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-brand-graphite border border-brand-charcoal rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto">
+                    <div className="absolute top-10 left-0 right-0 mt-1 bg-brand-graphite border border-brand-charcoal rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto">
                       {filteredStudentsSuggestions.map((std) => (
                         <div
                           key={std.id}
@@ -1101,25 +1103,27 @@ const RecessTerminal: React.FC = () => {
                           <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-1.5">
                             <AlertTriangle size={14} /> Requiere vincular un Alumno
                           </p>
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-steel" size={16} />
-                            <input
-                              type="text"
-                              inputMode="none"
-                              placeholder="Buscar alumno para cta cte..."
-                              className="w-full input-field pl-9 py-2 text-xs"
-                              value={checkoutStudentSearchQuery}
-                              onChange={(e) => {
-                                setCheckoutStudentSearchQuery(e.target.value);
-                                setShowCheckoutSearchDropdown(true);
-                              }}
-                              onFocus={() => setShowCheckoutSearchDropdown(true)}
-                            />
+                          <div className="relative flex flex-col gap-2">
+                            <div className="relative w-full">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-steel" size={16} />
+                              <input
+                                type="text"
+                                inputMode="none"
+                                placeholder="Buscar alumno para cta cte..."
+                                className="w-full input-field pl-9 py-2 text-xs"
+                                value={checkoutStudentSearchQuery}
+                                onChange={(e) => {
+                                  setCheckoutStudentSearchQuery(e.target.value);
+                                  setShowCheckoutSearchDropdown(true);
+                                }}
+                                onFocus={() => setShowCheckoutSearchDropdown(true)}
+                              />
+                            </div>
                             
                             {showCheckoutSearchDropdown && renderVirtualQwertyKeyboard(checkoutStudentSearchQuery, setCheckoutStudentSearchQuery, setShowCheckoutSearchDropdown)}
                             
                             {showCheckoutSearchDropdown && filteredCheckoutStudentsSuggestions.length > 0 && (
-                              <div className="absolute top-full left-0 right-0 mt-1 bg-brand-graphite border border-brand-charcoal rounded-xl shadow-2xl z-50 max-h-40 overflow-y-auto">
+                              <div className="absolute top-11 left-0 right-0 mt-1 bg-brand-graphite border border-brand-charcoal rounded-xl shadow-2xl z-50 max-h-40 overflow-y-auto">
                                 {filteredCheckoutStudentsSuggestions.map((std) => (
                                   <div
                                     key={std.id}

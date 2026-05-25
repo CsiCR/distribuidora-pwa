@@ -101,8 +101,62 @@ export const generateDemoData = (profileProducts: any[]) => {
     });
   }
 
-  // 2. Define standard Clients
+  // 2. Define standard Clients (including school students/teachers for Recess terminal)
   const clients: Client[] = [
+    {
+      id: 'student_1',
+      name: 'Lucas Alarcón',
+      fantasy_name: 'Lucas Alarcón (5to Año)',
+      cuit: '1001',
+      email: 'lucas@colegio.edu.ar',
+      phone: '11 9999-8888',
+      address: 'Colegio San Martin',
+      city: 'Lomas de Zamora',
+      zone: 'Colegio San Martin',
+      price_list: 'Minorista',
+      visit_days: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'],
+      status: 'Activo',
+      balance: -2500,
+      tax_condition: 'Consumidor Final',
+      credit_limit: 8000,
+      credential_id: '1001'
+    },
+    {
+      id: 'student_2',
+      name: 'Martina Gómez',
+      fantasy_name: 'Martina Gómez (3er Año)',
+      cuit: '1002',
+      email: 'martina@colegio.edu.ar',
+      phone: '11 7777-6666',
+      address: 'Colegio San Martin',
+      city: 'Lomas de Zamora',
+      zone: 'Colegio San Martin',
+      price_list: 'Minorista',
+      visit_days: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'],
+      status: 'Activo',
+      balance: 1500,
+      tax_condition: 'Consumidor Final',
+      credit_limit: 5000,
+      credential_id: '1002'
+    },
+    {
+      id: 'teacher_1',
+      name: 'Carlos Espósito',
+      fantasy_name: 'Prof. Carlos Espósito (Primaria)',
+      cuit: '2001',
+      email: 'carlos.esposito@colegio.edu.ar',
+      phone: '11 5555-4444',
+      address: 'Colegio San Martin',
+      city: 'Lomas de Zamora',
+      zone: 'Colegio San Martin',
+      price_list: 'Minorista',
+      visit_days: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'],
+      status: 'Activo',
+      balance: 0,
+      tax_condition: 'Monotributista',
+      credit_limit: 15000,
+      credential_id: '2001'
+    },
     {
       id: '1',
       name: 'Supermercado Horizonte S.A.',
