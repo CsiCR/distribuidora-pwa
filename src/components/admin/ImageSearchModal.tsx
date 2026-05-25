@@ -62,26 +62,102 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
     return cleaned.toLowerCase();
   };
 
-  // Perform search against our backend DuckDuckGo endpoint
+  // Perform search with multi-level fallbacks to guarantee results even under Vercel blocks
   const performSearch = async (queryText: string) => {
     if (!queryText.trim()) return;
     setIsLoading(true);
     setError(null);
     setSearchResults([]);
 
+    let data: any = null;
+    let searchSuccess = false;
+    let errors: string[] = [];
+
+    // Attempt 1: Backend proxy endpoint (Vercel serverless / local dev server)
     try {
       const res = await fetch(`/api/search-images?q=${encodeURIComponent(queryText.trim())}`);
-      if (!res.ok) {
-        let errMsg = 'Error al consultar el servidor de búsqueda.';
-        try {
-          const errData = await res.json();
-          if (errData && errData.error) errMsg = errData.error;
-        } catch (e) {}
-        throw new Error(errMsg);
+      if (res.ok) {
+        data = await res.json();
+        searchSuccess = true;
+      } else {
+        errors.push(`API local retornó código ${res.status}`);
       }
-      
-      const data = await res.json();
-      
+    } catch (err: any) {
+      errors.push(`API local falló: ${err.message}`);
+    }
+
+    // Attempt 2: Client-side fetch via corsproxy.io (works in client browser)
+    if (!searchSuccess) {
+      try {
+        console.log('API local bloqueada o fallida. Intentando proxy alternativo (CORSProxy.io)...');
+        const targetHtmlUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(queryText.trim())}`;
+        const corsHtmlUrl = `https://corsproxy.io/?${encodeURIComponent(targetHtmlUrl)}`;
+        const tokenRes = await fetch(corsHtmlUrl);
+        if (tokenRes.ok) {
+          const tokenHtml = await tokenRes.text();
+          const match = tokenHtml.match(/name="vqd"\s+value="([^"]+)"/);
+          const vqd = match ? match[1] : '';
+          
+          if (vqd) {
+            const targetImagesUrl = `https://duckduckgo.com/i.js?q=${encodeURIComponent(queryText.trim())}&o=json&vqd=${vqd}`;
+            const corsImagesUrl = `https://corsproxy.io/?${encodeURIComponent(targetImagesUrl)}`;
+            const imagesRes = await fetch(corsImagesUrl);
+            if (imagesRes.ok) {
+              const imagesData = await imagesRes.json();
+              data = imagesData.results || [];
+              searchSuccess = true;
+            } else {
+              errors.push(`corsproxy.io i.js retornó código ${imagesRes.status}`);
+            }
+          } else {
+            errors.push('corsproxy.io no pudo extraer el token VQD');
+          }
+        } else {
+          errors.push(`corsproxy.io html retornó código ${tokenRes.status}`);
+        }
+      } catch (err: any) {
+        errors.push(`CORSProxy.io falló: ${err.message}`);
+      }
+    }
+
+    // Attempt 3: Client-side fetch via allorigins.win (backup CORS proxy)
+    if (!searchSuccess) {
+      try {
+        console.log('Intentando proxy de respaldo (AllOrigins.win)...');
+        const targetHtmlUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(queryText.trim())}`;
+        const corsHtmlUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetHtmlUrl)}`;
+        const tokenRes = await fetch(corsHtmlUrl);
+        if (tokenRes.ok) {
+          const resData = await tokenRes.json();
+          const tokenHtml = resData.contents;
+          const match = tokenHtml ? tokenHtml.match(/name="vqd"\s+value="([^"]+)"/) : null;
+          const vqd = match ? match[1] : '';
+          
+          if (vqd) {
+            const targetImagesUrl = `https://duckduckgo.com/i.js?q=${encodeURIComponent(queryText.trim())}&o=json&vqd=${vqd}`;
+            const corsImagesUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetImagesUrl)}`;
+            const imagesRes = await fetch(corsImagesUrl);
+            if (imagesRes.ok) {
+              const imagesData = await imagesRes.json();
+              const parsedContents = JSON.parse(imagesData.contents);
+              data = parsedContents.results || [];
+              searchSuccess = true;
+            } else {
+              errors.push(`allorigins.win i.js retornó código ${imagesRes.status}`);
+            }
+          } else {
+            errors.push('allorigins.win no pudo extraer el token VQD');
+          }
+        } else {
+          errors.push(`allorigins.win html retornó código ${tokenRes.status}`);
+        }
+      } catch (err: any) {
+        errors.push(`AllOrigins.win falló: ${err.message}`);
+      }
+    }
+
+    // Final result handling
+    if (searchSuccess && data) {
       const results: SearchResult[] = (data || []).map((item: any) => ({
         url: item.image,
         thumbnail: item.thumbnail,
@@ -93,12 +169,12 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
       if (results.length === 0) {
         setError(`No se encontraron imágenes comerciales en la web para "${queryText}".`);
       }
-    } catch (err: any) {
-      console.error('Error during image search:', err);
-      setError(`Error de búsqueda: ${err.message || 'Asegúrate de estar conectado a internet y de que el servidor esté activo.'}`);
-    } finally {
-      setIsLoading(false);
+    } else {
+      console.error('All image search attempts failed:', errors);
+      setError(`No se pudo buscar automáticamente (el motor bloqueó el servidor). Por favor, usa el botón "Buscar en Google" abajo para copiar la URL de la imagen y pegarla en "Pegar URL Directa".`);
     }
+
+    setIsLoading(false);
   };
 
   // Initialize query on open

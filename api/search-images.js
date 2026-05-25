@@ -31,7 +31,12 @@ export default async function handler(req, res) {
     const vqd = match ? match[1] : '';
 
     if (!vqd) {
-      return res.status(500).json({ error: 'Failed to retrieve VQD token from DuckDuckGo' });
+      return res.status(500).json({ 
+        error: 'Failed to retrieve VQD token from DuckDuckGo',
+        status: tokenRes.status,
+        htmlLength: tokenHtml.length,
+        htmlSnippet: tokenHtml.substring(0, 500)
+      });
     }
 
     // 2. Fetch images
