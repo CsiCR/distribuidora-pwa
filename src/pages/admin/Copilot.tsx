@@ -1873,7 +1873,6 @@ Devuelve un JSON estrictamente con el siguiente esquema y sin marcas de markdown
           onClose={() => setActiveImageSearchIdx(null)}
           onSelectImage={(url) => handleEditItem(activeImageSearchIdx, 'image_url', url)}
           productName={invoiceItemsToProcess[activeImageSearchIdx].name}
-          category={invoiceItemsToProcess[activeImageSearchIdx].category}
           currentImageUrl={invoiceItemsToProcess[activeImageSearchIdx].image_url}
         />
       )}

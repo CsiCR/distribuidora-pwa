@@ -1099,7 +1099,6 @@ const StockManagement: React.FC = () => {
         onClose={() => setIsImageSearchModalOpen(false)}
         onSelectImage={(url) => setEditImageUrl(url)}
         productName={editName}
-        category={editCategory}
         currentImageUrl={editImageUrl}
       />
 

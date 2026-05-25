@@ -6,7 +6,6 @@ import {
   Globe, 
   Upload, 
   Trash2, 
-  Settings, 
   AlertCircle, 
   Check, 
   Loader2 
@@ -17,14 +16,14 @@ interface ImageSearchModalProps {
   onClose: () => void;
   onSelectImage: (url: string) => void;
   productName: string;
-  category: string;
   currentImageUrl?: string;
 }
 
 interface SearchResult {
   url: string;
+  thumbnail: string;
   title?: string;
-  source: 'Wikimedia' | 'Openverse' | 'Unsplash';
+  source: 'Web';
 }
 
 export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
@@ -37,12 +36,11 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [customImageUrl, setCustomImageUrl] = useState('');
-  const [unsplashKey, setUnsplashKey] = useState(() => localStorage.getItem('unsplash_access_key') || '');
-  const [showConfig, setShowConfig] = useState(false);
   const [activeTab, setActiveTab] = useState<'search' | 'upload' | 'url'>('search');
-  const [uploadProgress, setUploadProgress] = useState(false);
 
   // Clean product name to remove sizes, units, barcodes, etc. for better search accuracy
   const cleanProductName = (name: string): string => {
@@ -64,7 +62,7 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
     return cleaned.toLowerCase();
   };
 
-  // Perform search against Wikimedia Commons, Openverse and optionally Unsplash APIs
+  // Perform search against our backend DuckDuckGo endpoint
   const performSearch = async (queryText: string) => {
     if (!queryText.trim()) return;
     setIsLoading(true);
@@ -72,106 +70,25 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
     setSearchResults([]);
 
     try {
-      const results: SearchResult[] = [];
-      const queryEncoded = encodeURIComponent(queryText.trim());
+      const res = await fetch(`/api/search-images?q=${encodeURIComponent(queryText.trim())}`);
+      if (!res.ok) throw new Error('Error al consultar el servidor de búsqueda.');
+      
+      const data = await res.json();
+      
+      const results: SearchResult[] = (data || []).map((item: any) => ({
+        url: item.image,
+        thumbnail: item.thumbnail,
+        title: item.title,
+        source: 'Web'
+      }));
 
-      // 1. Wikimedia Commons API
-      const wikimediaPromise = fetch(
-        `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${queryEncoded}&gsrnamespace=6&prop=imageinfo&iiprop=url&format=json&origin=*`
-      )
-        .then(res => res.json())
-        .then(data => {
-          if (data.query?.pages) {
-            Object.values(data.query.pages).forEach((page: any) => {
-              const url = page.imageinfo?.[0]?.url;
-              if (url) {
-                const lowerUrl = url.toLowerCase();
-                // Filter out non-image files like PDFs
-                if (
-                  lowerUrl.endsWith('.jpg') || 
-                  lowerUrl.endsWith('.jpeg') || 
-                  lowerUrl.endsWith('.png') || 
-                  lowerUrl.endsWith('.webp') || 
-                  lowerUrl.endsWith('.gif') ||
-                  lowerUrl.endsWith('.svg')
-                ) {
-                  results.push({
-                    url,
-                    title: page.title?.replace(/^File:/i, ''),
-                    source: 'Wikimedia'
-                  });
-                }
-              }
-            });
-          }
-        })
-        .catch(err => console.error('Wikimedia fetch error:', err));
-
-      // 2. Openverse API
-      const openversePromise = fetch(
-        `https://api.openverse.org/v1/images/?q=${queryEncoded}`
-      )
-        .then(res => res.json())
-        .then(data => {
-          if (data.results) {
-            data.results.slice(0, 15).forEach((item: any) => {
-              if (item.url) {
-                results.push({
-                  url: item.url,
-                  title: item.title,
-                  source: 'Openverse'
-                });
-              }
-            });
-          }
-        })
-        .catch(err => console.error('Openverse fetch error:', err));
-
-      // 3. Unsplash API (Optional with User API Key)
-      let unsplashPromise = Promise.resolve();
-      const currentUnsplashKey = localStorage.getItem('unsplash_access_key');
-      if (currentUnsplashKey) {
-        unsplashPromise = fetch(
-          `https://api.unsplash.com/search/photos?query=${queryEncoded}&client_id=${currentUnsplashKey}&per_page=15`
-        )
-          .then(res => {
-            if (!res.ok) throw new Error('Unauthorized or rate limit reached');
-            return res.json();
-          })
-          .then(data => {
-            if (data.results) {
-              data.results.forEach((item: any) => {
-                if (item.urls?.regular) {
-                  results.push({
-                    url: item.urls.regular,
-                    title: item.alt_description || item.description,
-                    source: 'Unsplash'
-                  });
-                }
-              });
-            }
-          })
-          .catch(err => {
-            console.error('Unsplash fetch error:', err);
-            // Don't fail the whole search if only Unsplash fails
-          });
+      setSearchResults(results);
+      if (results.length === 0) {
+        setError(`No se encontraron imágenes comerciales en la web para "${queryText}".`);
       }
-
-      // Execute all fetches in parallel
-      await Promise.all([wikimediaPromise, openversePromise, unsplashPromise]);
-
-      // Deduplicate results by URL
-      const uniqueResults = results.filter((item, idx, self) => 
-        self.findIndex(t => t.url === item.url) === idx
-      );
-
-      setSearchResults(uniqueResults);
-      if (uniqueResults.length === 0) {
-        setError(`No se encontraron imágenes en la web para "${queryText}".`);
-      }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error during image search:', err);
-      setError('Error al conectar con los motores de búsqueda web.');
+      setError('Error al conectar con el servidor de búsqueda. Asegúrate de estar conectado a internet.');
     } finally {
       setIsLoading(false);
     }
@@ -198,12 +115,87 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
     window.open(`https://www.google.com/search?tbm=isch&q=${q}`, '_blank');
   };
 
+  // Download external image via our proxy and convert it to compressed WebP Base64
+  const processImageAndConvertToWebp = async (imageUrl: string) => {
+    setIsProcessing(true);
+    setProcessingStatus('Descargando y convirtiendo imagen a WebP...');
+    setError(null);
+    
+    try {
+      // 1. Fetch image bytes via proxy to bypass CORS
+      const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+      const res = await fetch(proxyUrl);
+      if (!res.ok) throw new Error('Error al descargar la imagen a través del proxy del servidor.');
+      
+      const blob = await res.blob();
+      
+      // 2. Convert blob to WebP using Canvas
+      await new Promise<void>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Resize image to max 800px width/height maintaining aspect ratio
+          const MAX_SIZE = 800;
+          if (width > MAX_SIZE || height > MAX_SIZE) {
+            if (width > height) {
+              height = Math.round((height * MAX_SIZE) / width);
+              width = MAX_SIZE;
+            } else {
+              width = Math.round((width * MAX_SIZE) / height);
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Convert to WebP format with 0.8 quality
+            const webpDataUrl = canvas.toDataURL('image/webp', 0.8);
+            
+            onSelectImage(webpDataUrl);
+            URL.revokeObjectURL(img.src);
+            resolve();
+          } else {
+            reject(new Error('No se pudo inicializar el contexto del canvas en 2D.'));
+          }
+        };
+
+        img.onerror = () => {
+          URL.revokeObjectURL(img.src);
+          reject(new Error('La imagen descargada no tiene un formato válido para procesar.'));
+        };
+
+        img.src = URL.createObjectURL(blob);
+      });
+      
+      onClose();
+    } catch (err: any) {
+      console.error('Error converting image to WebP:', err);
+      setError(`No se pudo procesar la imagen en WebP: ${err.message || 'Error de CORS o conexión'}. Asignando URL original como respaldo.`);
+      
+      // Fallback: assign original URL if proxy/canvas fails
+      onSelectImage(imageUrl);
+      onClose();
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   // Handle local file load, canvas WebP conversion, and assign
   const handleLocalFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploadProgress(true);
+    setIsProcessing(true);
+    setProcessingStatus('Procesando y convirtiendo foto local a WebP...');
+    setError(null);
     const reader = new FileReader();
 
     reader.onload = (event) => {
@@ -236,17 +228,17 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
           const webpDataUrl = canvas.toDataURL('image/webp', 0.8);
           
           onSelectImage(webpDataUrl);
-          setUploadProgress(false);
+          setIsProcessing(false);
           onClose();
         } else {
           setError('Error al procesar la imagen con el Canvas.');
-          setUploadProgress(false);
+          setIsProcessing(false);
         }
       };
 
       img.onerror = () => {
         setError('El archivo seleccionado no es una imagen válida.');
-        setUploadProgress(false);
+        setIsProcessing(false);
       };
 
       img.src = event.target?.result as string;
@@ -254,19 +246,10 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
 
     reader.onerror = () => {
       setError('Error al leer el archivo local.');
-      setUploadProgress(false);
+      setIsProcessing(false);
     };
 
     reader.readAsDataURL(file);
-  };
-
-  const handleSaveUnsplashKey = () => {
-    localStorage.setItem('unsplash_access_key', unsplashKey.trim());
-    setShowConfig(false);
-    alert('API Key de Unsplash guardada correctamente.');
-    if (searchQuery) {
-      performSearch(searchQuery);
-    }
   };
 
   if (!isOpen) return null;
@@ -284,60 +267,14 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
               <p className="text-[10px] text-brand-steel font-medium">Asignar una foto para el catálogo y la terminal</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowConfig(!showConfig)}
-              className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                showConfig 
-                  ? 'bg-brand-gold/10 border-brand-gold text-brand-gold' 
-                  : 'bg-brand-charcoal/20 border-brand-charcoal hover:border-brand-steel/30 text-brand-steel hover:text-brand-smoke'
-              }`}
-              title="Configurar Unsplash API Key"
-            >
-              <Settings size={16} />
-            </button>
-            <button 
-              type="button" 
-              onClick={onClose}
-              className="p-2 bg-brand-charcoal/20 border border-brand-charcoal hover:border-brand-steel/30 rounded-xl text-brand-steel hover:text-brand-smoke transition-all cursor-pointer"
-            >
-              <X size={16} />
-            </button>
-          </div>
+          <button 
+            type="button" 
+            onClick={onClose}
+            className="p-2 bg-brand-charcoal/20 border border-brand-charcoal hover:border-brand-steel/30 rounded-xl text-brand-steel hover:text-brand-smoke transition-all cursor-pointer"
+          >
+            <X size={16} />
+          </button>
         </div>
-
-        {/* Unsplash Settings Panel */}
-        {showConfig && (
-          <div className="bg-brand-wine/5 border-b border-brand-charcoal p-6 space-y-4 animate-in slide-in-from-top duration-200">
-            <div className="flex items-center gap-2 text-brand-gold text-xs font-black uppercase tracking-wider">
-              <Settings size={14} /> Configurar API de Unsplash (Opcional)
-            </div>
-            <p className="text-[11px] text-brand-steel leading-relaxed">
-              Para obtener mejores fotos comerciales de stock en tiempo real, puedes crear una cuenta gratuita en{' '}
-              <a href="https://unsplash.com/developers" target="_blank" rel="noreferrer" className="text-brand-gold underline hover:text-brand-gold/80">
-                unsplash.com/developers
-              </a>{' '}
-              e ingresar tu <strong>Access Key</strong> aquí. Si no lo deseas, el sistema utilizará Wikimedia y Openverse.
-            </p>
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={unsplashKey}
-                onChange={(e) => setUnsplashKey(e.target.value)}
-                placeholder="Pegar tu Unsplash Access Key aquí..."
-                className="flex-1 bg-brand-black border border-brand-charcoal rounded-xl px-4 py-2.5 text-xs text-brand-smoke focus:outline-none focus:border-brand-gold/50 font-mono"
-              />
-              <button
-                type="button"
-                onClick={handleSaveUnsplashKey}
-                className="bg-brand-gold text-brand-black hover:bg-brand-gold/90 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
-              >
-                Guardar
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Tab Navigation */}
         <div className="flex border-b border-brand-charcoal bg-brand-charcoal/10">
@@ -376,6 +313,14 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
           </button>
         </div>
 
+        {/* Processing overlay */}
+        {isProcessing && (
+          <div className="bg-brand-gold/10 border-b border-brand-gold/20 px-6 py-4 flex items-center justify-center gap-3 text-xs text-brand-gold font-bold uppercase tracking-wider animate-pulse">
+            <Loader2 className="animate-spin" size={16} />
+            <span>{processingStatus}</span>
+          </div>
+        )}
+
         {/* Content Body */}
         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar min-h-[300px]">
           
@@ -392,11 +337,12 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Escribir palabras clave del producto..."
                     className="w-full bg-brand-charcoal/20 border border-brand-charcoal focus:border-brand-gold rounded-xl pl-10 pr-4 py-2.5 text-xs text-brand-smoke focus:outline-none transition-all"
+                    disabled={isProcessing}
                   />
                 </div>
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || isProcessing}
                   className="bg-brand-gold hover:bg-brand-gold/90 text-brand-black font-black uppercase text-xs tracking-wider px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {isLoading ? <Loader2 className="animate-spin" size={14} /> : 'Buscar'}
@@ -410,13 +356,14 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
                     <Globe size={14} className="text-brand-gold" /> ¿No encuentras la foto ideal?
                   </p>
                   <p className="text-[10px] text-brand-steel max-w-md leading-relaxed">
-                    Abre Google Imágenes para el producto actual, copia la dirección de la foto que quieras, y pégala en la pestaña <strong>"Pegar URL Directa"</strong>.
+                    Abre Google Imágenes para el producto actual, copia la dirección de la foto que quieras, y pégala en la pestaña <strong>"Pegar URL Directa"</strong> para descargarla como WebP.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={handleGoogleImagesSearch}
                   className="bg-brand-wine hover:bg-brand-wine/90 text-white font-bold text-xs uppercase tracking-wider px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap"
+                  disabled={isProcessing}
                 >
                   <Globe size={14} /> Buscar en Google
                 </button>
@@ -445,18 +392,21 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
                     <div
                       key={idx}
                       onClick={() => {
-                        onSelectImage(result.url);
-                        onClose();
+                        if (!isProcessing) {
+                          processImageAndConvertToWebp(result.url);
+                        }
                       }}
-                      className="group relative aspect-square rounded-2xl overflow-hidden border border-brand-charcoal hover:border-brand-gold cursor-pointer bg-brand-charcoal/10 transition-all duration-300 transform hover:scale-102 flex items-center justify-center"
+                      className={`group relative aspect-square rounded-2xl overflow-hidden border border-brand-charcoal hover:border-brand-gold cursor-pointer bg-brand-charcoal/10 transition-all duration-300 transform hover:scale-102 flex items-center justify-center ${
+                        isProcessing ? 'pointer-events-none opacity-55' : ''
+                      }`}
                     >
-                      <img src={result.url} alt={result.title || 'Product'} className="w-full h-full object-cover" loading="lazy" />
+                      <img src={result.thumbnail} alt={result.title || 'Product'} className="w-full h-full object-cover" loading="lazy" />
                       <div className="absolute inset-0 bg-brand-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center p-2 text-center transition-all">
                         <span className="text-[10px] font-black text-brand-gold uppercase tracking-wider mb-1">
-                          Seleccionar
+                          Guardar WebP
                         </span>
                         <span className="text-[8px] text-brand-steel uppercase font-mono bg-brand-black/80 px-1.5 py-0.5 rounded border border-brand-charcoal">
-                          {result.source}
+                          DDG / Google
                         </span>
                       </div>
                     </div>
@@ -476,18 +426,18 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
                   accept="image/png, image/jpeg, image/jpg, image/gif, image/webp"
                   onChange={handleLocalFileChange}
                   className="hidden"
-                  disabled={uploadProgress}
+                  disabled={isProcessing}
                 />
                 <label
                   htmlFor="image-file-upload"
                   className={`border-2 border-dashed border-brand-charcoal hover:border-brand-gold/50 rounded-2xl p-10 text-center cursor-pointer transition-all hover:bg-brand-charcoal/10 flex flex-col items-center justify-center ${
-                    uploadProgress ? 'opacity-50 pointer-events-none' : ''
+                    isProcessing ? 'opacity-50 pointer-events-none' : ''
                   }`}
                 >
-                  {uploadProgress ? (
+                  {isProcessing ? (
                     <>
                       <Loader2 className="mx-auto text-brand-gold mb-3 animate-spin" size={32} />
-                      <p className="text-xs text-brand-gold font-black uppercase tracking-wider">Procesando y Convirtiendo a WebP...</p>
+                      <p className="text-xs text-brand-gold font-black uppercase tracking-wider">{processingStatus}</p>
                     </>
                   ) : (
                     <>
@@ -495,7 +445,7 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
                       <p className="text-xs text-brand-smoke font-bold">Haz clic aquí para seleccionar una foto</p>
                       <p className="text-[10px] text-brand-steel mt-1.5 leading-relaxed">
                         Soporta JPG, JPEG, PNG, WEBP, GIF. <br />
-                        <span className="text-brand-gold/80 font-semibold">La imagen se redimensionará a máx. 800px y se convertirá a formato WebP optimizado para no ocupar espacio.</span>
+                        <span className="text-brand-gold/80 font-semibold">La foto se convertirá localmente a formato WebP optimizado antes de guardarse en base de datos.</span>
                       </p>
                     </>
                   )}
@@ -523,26 +473,34 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
                     onChange={(e) => setCustomImageUrl(e.target.value)}
                     placeholder="https://ejemplo.com/imagen-del-producto.jpg"
                     className="flex-1 bg-brand-charcoal/20 border border-brand-charcoal focus:border-brand-gold rounded-xl px-4 py-2.5 text-xs text-brand-smoke focus:outline-none transition-all"
+                    disabled={isProcessing}
                   />
                   <button
                     type="button"
+                    disabled={isProcessing}
                     onClick={() => {
                       if (customImageUrl.trim()) {
-                        onSelectImage(customImageUrl.trim());
-                        onClose();
+                        processImageAndConvertToWebp(customImageUrl.trim());
                       } else {
                         alert('Por favor ingresa una URL de imagen válida.');
                       }
                     }}
-                    className="bg-brand-gold text-brand-black hover:bg-brand-gold/90 font-black uppercase text-xs tracking-wider px-5 py-2.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                    className="bg-brand-gold text-brand-black hover:bg-brand-gold/90 font-black uppercase text-xs tracking-wider px-5 py-2.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                   >
-                    <Check size={14} /> Asignar
+                    {isProcessing ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />} Asignar como WebP
                   </button>
                 </div>
                 <p className="text-[10px] text-brand-steel leading-normal mt-2">
-                  Pega cualquier dirección URL directa de imagen web (debe iniciar con http:// o https:// y usualmente terminar en .jpg, .png o .webp).
+                  Pega cualquier dirección URL directa de imagen web. El servidor proxy la descargará y convertirá en WebP Base64 para guardarla de manera segura y definitiva.
                 </p>
               </div>
+
+              {error && (
+                <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl flex items-center gap-3 text-rose-400 text-xs">
+                  <AlertCircle size={16} />
+                  <p>{error}</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -553,11 +511,12 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
           {currentImageUrl ? (
             <button
               type="button"
+              disabled={isProcessing}
               onClick={() => {
                 onSelectImage('');
                 onClose();
               }}
-              className="text-xs text-rose-400 font-bold hover:underline flex items-center gap-1.5 cursor-pointer"
+              className="text-xs text-rose-400 font-bold hover:underline flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <Trash2 size={14} /> Quitar imagen y usar placeholder
             </button>
@@ -566,8 +525,9 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
           )}
           <button 
             type="button"
+            disabled={isProcessing}
             onClick={onClose}
-            className="px-5 py-2.5 border border-brand-charcoal hover:border-brand-smoke/30 text-brand-smoke rounded-xl text-xs font-bold uppercase tracking-widest transition-colors cursor-pointer"
+            className="px-5 py-2.5 border border-brand-charcoal hover:border-brand-smoke/30 text-brand-smoke rounded-xl text-xs font-bold uppercase tracking-widest transition-colors cursor-pointer disabled:opacity-50"
           >
             Cerrar
           </button>
