@@ -191,7 +191,7 @@ export const SupabaseSyncService = {
                     quantity: item.quantity,
                     price: item.price
                   })),
-                  observations: `Venta de Recreo. Modo de cobro: ${offOrd.payment_method}`
+                  observations: offOrd.observations || `Venta de Recreo. Modo de cobro: ${offOrd.payment_method}`
                 });
               }
             }

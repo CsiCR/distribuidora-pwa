@@ -18,6 +18,7 @@ export interface OfflineOrder {
   payment_method: 'Efectivo' | 'Cuenta Corriente' | 'Mixto';
   cash_amount: number;
   credit_amount: number;
+  observations?: string;
   synced: boolean;
 }
 
@@ -210,7 +211,16 @@ export const useOfflineSalesStore = create<OfflineSalesState>()(
         }, 0);
         
         const orderId = `REC-${Math.floor(100000 + Math.random() * 900000)}`;
-        
+
+        let observations = '';
+        if (paymentMethod === 'Mixto') {
+          observations = `Venta de Recreo. Pago Mixto - Efectivo: $${cashPaid.toLocaleString('es-AR')} / Cta Cte: $${creditPaid.toLocaleString('es-AR')}`;
+        } else if (paymentMethod === 'Efectivo') {
+          observations = `Venta de Recreo. Pago en Efectivo: $${total.toLocaleString('es-AR')}`;
+        } else {
+          observations = `Venta de Recreo. Cargo a Cuenta Corriente: $${total.toLocaleString('es-AR')}`;
+        }
+
         const newOrder: OfflineOrder = {
           id: orderId,
           client_id: clientId,
@@ -226,6 +236,7 @@ export const useOfflineSalesStore = create<OfflineSalesState>()(
           payment_method: paymentMethod,
           cash_amount: paymentMethod === 'Efectivo' ? total : paymentMethod === 'Cuenta Corriente' ? 0 : cashPaid,
           credit_amount: paymentMethod === 'Cuenta Corriente' ? total : paymentMethod === 'Efectivo' ? 0 : creditPaid,
+          observations,
           synced: false
         };
         
@@ -250,23 +261,20 @@ export const useOfflineSalesStore = create<OfflineSalesState>()(
           });
         });
         
-        // 3. Update client credit account balance locally & register ledger transactions (Only for credit/debt portion)
+        // 3. Update client credit account balance locally & register ledger transactions
         if (selectedClient) {
           const isFacturaA = selectedClient.tax_condition === 'Responsable Inscripto';
           
-          // The actual debt amount charged to the current account
-          const debtAmount = paymentMethod === 'Cuenta Corriente' ? total : (paymentMethod === 'Mixto' ? creditPaid : 0);
+          if (paymentMethod === 'Cuenta Corriente') {
+            const net_amount = parseFloat((total / 1.21).toFixed(2));
+            const iva_amount = parseFloat((total - net_amount).toFixed(2));
 
-          if (debtAmount > 0) {
-            const net_amount = parseFloat((debtAmount / 1.21).toFixed(2));
-            const iva_amount = parseFloat((debtAmount - net_amount).toFixed(2));
-
-            // Register invoice for the credit debt portion in the client's ledger history
+            // Register invoice for total amount in ledger
             useTransactionsStore.getState().addTransaction({
               client_id: selectedClient.id,
               type: 'FACTURA',
               reference: orderId,
-              amount: debtAmount,
+              amount: total,
               status: 'PENDIENTE',
               notes: `Venta Modo Recreo ${orderId} (Cta Cte)`,
               tax_condition: selectedClient.tax_condition,
@@ -275,8 +283,79 @@ export const useOfflineSalesStore = create<OfflineSalesState>()(
               iva_amount
             });
 
-            // Update client outstanding balance
-            useClientsStore.getState().updateBalance(selectedClient.id, -debtAmount);
+            // Update client outstanding balance by charging full amount
+            useClientsStore.getState().updateBalance(selectedClient.id, -total);
+          } else if (paymentMethod === 'Mixto') {
+            const net_amount = parseFloat((total / 1.21).toFixed(2));
+            const iva_amount = parseFloat((total - net_amount).toFixed(2));
+
+            // Register invoice for the FULL amount of the purchase
+            useTransactionsStore.getState().addTransaction({
+              client_id: selectedClient.id,
+              type: 'FACTURA',
+              reference: orderId,
+              amount: total,
+              status: 'PENDIENTE',
+              notes: `Venta Modo Recreo ${orderId} (Pago Mixto)`,
+              tax_condition: selectedClient.tax_condition,
+              invoice_type: isFacturaA ? 'A' : 'B',
+              net_amount,
+              iva_amount
+            });
+
+            // Register payment receipt for the cash paid portion
+            if (cashPaid > 0) {
+              useTransactionsStore.getState().addTransaction({
+                client_id: selectedClient.id,
+                type: 'PAGO',
+                reference: `RECIBO-${orderId}`,
+                amount: cashPaid,
+                status: 'PAGADO',
+                payment_method: 'EFECTIVO',
+                notes: `Entrega Efectivo Venta Mixta ${orderId}`,
+                tax_condition: selectedClient.tax_condition,
+                invoice_type: undefined,
+                net_amount: undefined,
+                iva_amount: undefined
+              });
+            }
+
+            // Update client outstanding balance by charging only the remaining credit portion
+            useClientsStore.getState().updateBalance(selectedClient.id, -creditPaid);
+          } else if (paymentMethod === 'Efectivo') {
+            const net_amount = parseFloat((total / 1.21).toFixed(2));
+            const iva_amount = parseFloat((total - net_amount).toFixed(2));
+
+            // Register invoice for full amount
+            useTransactionsStore.getState().addTransaction({
+              client_id: selectedClient.id,
+              type: 'FACTURA',
+              reference: orderId,
+              amount: total,
+              status: 'PAGADO',
+              notes: `Venta Modo Recreo ${orderId} (Efectivo)`,
+              tax_condition: selectedClient.tax_condition,
+              invoice_type: isFacturaA ? 'A' : 'B',
+              net_amount,
+              iva_amount
+            });
+
+            // Register payment receipt for the full amount paid in cash
+            useTransactionsStore.getState().addTransaction({
+              client_id: selectedClient.id,
+              type: 'PAGO',
+              reference: `RECIBO-${orderId}`,
+              amount: total,
+              status: 'PAGADO',
+              payment_method: 'EFECTIVO',
+              notes: `Pago Efectivo Venta ${orderId}`,
+              tax_condition: selectedClient.tax_condition,
+              invoice_type: undefined,
+              net_amount: undefined,
+              iva_amount: undefined
+            });
+
+            // No balance change because it was paid fully in cash
           }
         }
         
@@ -319,7 +398,7 @@ export const useOfflineSalesStore = create<OfflineSalesState>()(
                 quantity: item.quantity,
                 price: item.price
               })),
-              observations: `Venta de Recreo. Modo de cobro: ${order.payment_method}`
+              observations: order.observations || `Venta de Recreo. Modo de cobro: ${order.payment_method}`
             });
           });
 

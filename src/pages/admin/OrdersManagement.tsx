@@ -713,7 +713,7 @@ const OrdersManagement: React.FC = () => {
                        <div className="text-right">
                           <p className="text-[9px]"><b>CUIT:</b> {activeClient?.cuit || 'S/D'}</p>
                           <p className="text-[9px]"><b>Condición IVA:</b> {activeClient?.tax_condition || 'S/D'}</p>
-                          <p className="text-[9px]"><b>Forma de Pago:</b> Cuenta Corriente</p>
+                          <p className="text-[9px]"><b>Forma de Pago:</b> {selectedOrder.observations?.includes("Pago Mixto") ? selectedOrder.observations.replace("Venta de Recreo. ", "") : selectedOrder.observations?.includes("Pago en Efectivo") ? "Efectivo" : "Cuenta Corriente"}</p>
                        </div>
                     </div>
 
