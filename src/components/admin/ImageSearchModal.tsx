@@ -71,7 +71,14 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
 
     try {
       const res = await fetch(`/api/search-images?q=${encodeURIComponent(queryText.trim())}`);
-      if (!res.ok) throw new Error('Error al consultar el servidor de búsqueda.');
+      if (!res.ok) {
+        let errMsg = 'Error al consultar el servidor de búsqueda.';
+        try {
+          const errData = await res.json();
+          if (errData && errData.error) errMsg = errData.error;
+        } catch (e) {}
+        throw new Error(errMsg);
+      }
       
       const data = await res.json();
       
@@ -88,7 +95,7 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
       }
     } catch (err: any) {
       console.error('Error during image search:', err);
-      setError('Error al conectar con el servidor de búsqueda. Asegúrate de estar conectado a internet.');
+      setError(`Error de búsqueda: ${err.message || 'Asegúrate de estar conectado a internet y de que el servidor esté activo.'}`);
     } finally {
       setIsLoading(false);
     }

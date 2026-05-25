@@ -27,17 +27,25 @@ export default async function handler(req, res) {
     });
     const tokenHtml = await tokenRes.text();
     
-    // Extract VQD token using regexes
-    const vqdRegex = /vqd=(['"])([^'"]+)\1/;
-    const vqdMatch = tokenHtml.match(vqdRegex);
+    // Extract VQD token using regexes with optional spaces support
     let vqd = '';
-    if (vqdMatch) {
-      vqd = vqdMatch[2];
+    const match1 = tokenHtml.match(/vqd=(['"])([^'"]+)\1/);
+    if (match1) {
+      vqd = match1[2];
     } else {
-      const vqdRegex2 = /vqd:(['"])([^'"]+)\1/;
-      const vqdMatch2 = tokenHtml.match(vqdRegex2);
-      if (vqdMatch2) {
-        vqd = vqdMatch2[2];
+      const match2 = tokenHtml.match(/vqd:\s*(['"])([^'"]+)\1/);
+      if (match2) {
+        vqd = match2[2];
+      } else {
+        const match3 = tokenHtml.match(/vqd\s*=\s*(['"])([^'"]+)\1/);
+        if (match3) {
+          vqd = match3[2];
+        } else {
+          const match4 = tokenHtml.match(/vqd\s*=\s*([^;,\s"']+)/);
+          if (match4) {
+            vqd = match4[1].trim();
+          }
+        }
       }
     }
 
