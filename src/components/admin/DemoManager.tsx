@@ -58,31 +58,36 @@ export const DemoManager: React.FC = () => {
     const profile = seedProfiles[type];
     const demoData = generateDemoData(profile.products);
 
-    // 1. Clear Supabase
-    await SupabaseSyncService.clearAllSupabaseData();
+    try {
+      // 1. Clear Supabase
+      await SupabaseSyncService.clearAllSupabaseData();
 
-    // 2. Clear Local Stores
-    clearStore();
-    clearOrders();
-    clearClients();
-    clearParkedOrders();
-    clearTransactions();
-    clearTerminal();
-    clearProviders();
-    clearCart();
-    
-    // 3. Hydrate Local Stores with Seed Data
-    setProducts(demoData.products);
-    setClients(demoData.clients);
-    setProvidersData(demoData.providers, demoData.providerInvoices, demoData.providerPayments);
-    setOrders(demoData.orders);
-    setTransactions(demoData.transactions);
+      // 2. Clear Local Stores
+      clearStore();
+      clearOrders();
+      clearClients();
+      clearParkedOrders();
+      clearTransactions();
+      clearTerminal();
+      clearProviders();
+      clearCart();
+      
+      // 3. Hydrate Local Stores with Seed Data
+      setProducts(demoData.products);
+      setClients(demoData.clients);
+      setProvidersData(demoData.providers, demoData.providerInvoices, demoData.providerPayments);
+      setOrders(demoData.orders);
+      setTransactions(demoData.transactions);
 
-    // 4. Batch Upload Seed Data to Supabase
-    await SupabaseSyncService.pushAllLocalData();
+      // 4. Batch Upload Seed Data to Supabase
+      await SupabaseSyncService.pushAllLocalData();
 
-    setIsOpen(false);
-    alert(`Cargado perfil de demostración: ${profile.name} con 5 días de movimientos en local y Supabase.`);
+      setIsOpen(false);
+      alert(`Cargado perfil de demostración: ${profile.name} con 5 días de movimientos en local y Supabase.`);
+    } catch (err: any) {
+      console.error('Error seeding demo profile:', err);
+      alert(`Error al cargar datos en Supabase:\n\n${err?.message || err}\n\nPor favor, verifica los permisos de tu base de datos o recarga la página.`);
+    }
   };
 
   const handleNameChange = () => {

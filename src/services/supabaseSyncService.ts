@@ -220,7 +220,7 @@ export const SupabaseSyncService = {
 
       // 1. Push settings
       const settings = useSettingsStore.getState();
-      await supabase.from('settings').upsert({
+      const { error: err1 } = await supabase.from('settings').upsert({
         id: 'global',
         distributor_name: settings.distributorName,
         cuit: settings.cuit,
@@ -232,25 +232,28 @@ export const SupabaseSyncService = {
         init_activity: settings.initActivity,
         loose_unit_surcharge: settings.looseUnitSurcharge
       });
+      if (err1) throw new Error(`[Tabla settings]: ${err1.message}`);
 
       // 2. Push products
       const products = useStockStore.getState().products;
       if (products.length > 0) {
         const dbProducts = products.map(mapAppProductToDb);
-        await supabase.from('products').upsert(dbProducts);
+        const { error: err2 } = await supabase.from('products').upsert(dbProducts);
+        if (err2) throw new Error(`[Tabla products]: ${err2.message}`);
       }
 
       // 3. Push clients
       const clients = useClientsStore.getState().clients;
       if (clients.length > 0) {
         const dbClients = clients.map(mapAppClientToDb);
-        await supabase.from('clients').upsert(dbClients);
+        const { error: err3 } = await supabase.from('clients').upsert(dbClients);
+        if (err3) throw new Error(`[Tabla clients]: ${err3.message}`);
       }
 
       // 4. Push orders & order_items
       const orders = useOrdersStore.getState().orders;
       for (const order of orders) {
-        await supabase.from('orders').upsert({
+        const { error: errOrd } = await supabase.from('orders').upsert({
           id: order.id,
           client_id: order.client_id,
           client_name: order.client_name,
@@ -263,9 +266,12 @@ export const SupabaseSyncService = {
           iva_amount: order.iva_amount,
           observations: order.observations
         });
+        if (errOrd) throw new Error(`[Tabla orders, id ${order.id}]: ${errOrd.message}`);
 
         if (order.items && order.items.length > 0) {
-          await supabase.from('order_items').delete().eq('order_id', order.id);
+          const { error: errDelItem } = await supabase.from('order_items').delete().eq('order_id', order.id);
+          if (errDelItem) throw new Error(`[Tabla order_items delete, order_id ${order.id}]: ${errDelItem.message}`);
+          
           const dbItems = order.items.map((item: any) => ({
             id: `${order.id}-${item.id}`,
             order_id: order.id,
@@ -274,26 +280,29 @@ export const SupabaseSyncService = {
             quantity: item.quantity,
             price: item.price
           }));
-          await supabase.from('order_items').insert(dbItems);
+          const { error: errInsItem } = await supabase.from('order_items').insert(dbItems);
+          if (errInsItem) throw new Error(`[Tabla order_items insert, order_id ${order.id}]: ${errInsItem.message}`);
         }
       }
 
       // 5. Push transactions
       const transactions = useTransactionsStore.getState().transactions;
       if (transactions.length > 0) {
-        await supabase.from('transactions').upsert(transactions);
+        const { error: errTx } = await supabase.from('transactions').upsert(transactions);
+        if (errTx) throw new Error(`[Tabla transactions]: ${errTx.message}`);
       }
 
       // 6. Push providers & provider documents
       const providers = useProvidersStore.getState().providers;
       if (providers.length > 0) {
         const dbProv = providers.map(mapAppProviderToDb);
-        await supabase.from('providers').upsert(dbProv);
+        const { error: errProv } = await supabase.from('providers').upsert(dbProv);
+        if (errProv) throw new Error(`[Tabla providers]: ${errProv.message}`);
       }
 
       const providerInvoices = useProvidersStore.getState().invoices;
       for (const inv of providerInvoices) {
-        await supabase.from('provider_invoices').upsert({
+        const { error: errPInv } = await supabase.from('provider_invoices').upsert({
           id: inv.id,
           provider_id: inv.provider_id,
           invoice_number: inv.invoice_number,
@@ -303,9 +312,12 @@ export const SupabaseSyncService = {
           total_iva: inv.total_iva,
           total: inv.total
         });
+        if (errPInv) throw new Error(`[Tabla provider_invoices, id ${inv.id}]: ${errPInv.message}`);
 
         if (inv.items && inv.items.length > 0) {
-          await supabase.from('provider_invoice_items').delete().eq('invoice_id', inv.id);
+          const { error: errPDelItem } = await supabase.from('provider_invoice_items').delete().eq('invoice_id', inv.id);
+          if (errPDelItem) throw new Error(`[Tabla provider_invoice_items delete, invoice_id ${inv.id}]: ${errPDelItem.message}`);
+          
           const dbItems = inv.items.map((item: any, index: number) => ({
             id: `${inv.id}-${index}`,
             invoice_id: inv.id,
@@ -315,13 +327,15 @@ export const SupabaseSyncService = {
             iva_rate: item.iva_rate,
             cost_final: item.cost_final
           }));
-          await supabase.from('provider_invoice_items').insert(dbItems);
+          const { error: errPInsItem } = await supabase.from('provider_invoice_items').insert(dbItems);
+          if (errPInsItem) throw new Error(`[Tabla provider_invoice_items insert, invoice_id ${inv.id}]: ${errPInsItem.message}`);
         }
       }
 
       const providerPayments = useProvidersStore.getState().payments;
       if (providerPayments.length > 0) {
-        await supabase.from('provider_payments').upsert(providerPayments);
+        const { error: errPPay } = await supabase.from('provider_payments').upsert(providerPayments);
+        if (errPPay) throw new Error(`[Tabla provider_payments]: ${errPPay.message}`);
       }
 
       // 7. Push audit logs
@@ -341,14 +355,15 @@ export const SupabaseSyncService = {
           timestamp: l.timestamp,
           user_name: l.user
         }));
-        await supabase.from('stock_audit_logs').upsert(dbLogs);
+        const { error: errAudit } = await supabase.from('stock_audit_logs').upsert(dbLogs);
+        if (errAudit) throw new Error(`[Tabla stock_audit_logs]: ${errAudit.message}`);
       }
 
       console.log('Local cache uploaded successfully!');
       return true;
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error uploading local cache to Supabase:', e);
-      return false;
+      throw e;
     }
   },
 
@@ -361,23 +376,44 @@ export const SupabaseSyncService = {
       console.log('Clearing all remote data from Supabase...');
       
       // Delete all records from each table
-      await supabase.from('order_items').delete().neq('id', '_dummy_');
-      await supabase.from('orders').delete().neq('id', '_dummy_');
-      await supabase.from('transactions').delete().neq('id', '_dummy_');
-      await supabase.from('stock_audit_logs').delete().neq('id', '_dummy_');
-      await supabase.from('provider_invoice_items').delete().neq('id', '_dummy_');
-      await supabase.from('provider_invoices').delete().neq('id', '_dummy_');
-      await supabase.from('provider_payments').delete().neq('id', '_dummy_');
-      await supabase.from('products').delete().neq('id', '_dummy_');
-      await supabase.from('clients').delete().neq('id', '_dummy_');
-      await supabase.from('providers').delete().neq('id', '_dummy_');
-      await supabase.from('settings').delete().neq('id', '_dummy_');
+      const { error: e1 } = await supabase.from('order_items').delete().neq('id', '_dummy_');
+      if (e1) throw new Error(`[Borrar order_items]: ${e1.message}`);
+
+      const { error: e2 } = await supabase.from('orders').delete().neq('id', '_dummy_');
+      if (e2) throw new Error(`[Borrar orders]: ${e2.message}`);
+
+      const { error: e3 } = await supabase.from('transactions').delete().neq('id', '_dummy_');
+      if (e3) throw new Error(`[Borrar transactions]: ${e3.message}`);
+
+      const { error: e4 } = await supabase.from('stock_audit_logs').delete().neq('id', '_dummy_');
+      if (e4) throw new Error(`[Borrar stock_audit_logs]: ${e4.message}`);
+
+      const { error: e5 } = await supabase.from('provider_invoice_items').delete().neq('id', '_dummy_');
+      if (e5) throw new Error(`[Borrar provider_invoice_items]: ${e5.message}`);
+
+      const { error: e6 } = await supabase.from('provider_invoices').delete().neq('id', '_dummy_');
+      if (e6) throw new Error(`[Borrar provider_invoices]: ${e6.message}`);
+
+      const { error: e7 } = await supabase.from('provider_payments').delete().neq('id', '_dummy_');
+      if (e7) throw new Error(`[Borrar provider_payments]: ${e7.message}`);
+
+      const { error: e8 } = await supabase.from('products').delete().neq('id', '_dummy_');
+      if (e8) throw new Error(`[Borrar products]: ${e8.message}`);
+
+      const { error: e9 } = await supabase.from('clients').delete().neq('id', '_dummy_');
+      if (e9) throw new Error(`[Borrar clients]: ${e9.message}`);
+
+      const { error: e10 } = await supabase.from('providers').delete().neq('id', '_dummy_');
+      if (e10) throw new Error(`[Borrar providers]: ${e10.message}`);
+
+      const { error: e11 } = await supabase.from('settings').delete().neq('id', '_dummy_');
+      if (e11) throw new Error(`[Borrar settings]: ${e11.message}`);
       
       console.log('All remote data cleared successfully.');
       return true;
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error clearing remote Supabase data:', e);
-      return false;
+      throw e;
     }
   }
 };
