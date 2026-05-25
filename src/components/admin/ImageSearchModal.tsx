@@ -61,7 +61,6 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
     
     return cleaned.toLowerCase();
   };
-
   // Perform search with multi-level fallbacks to guarantee results even under Vercel blocks
   const performSearch = async (queryText: string) => {
     if (!queryText.trim()) return;
@@ -86,10 +85,39 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
       errors.push(`API local falló: ${err.message}`);
     }
 
-    // Attempt 2: Client-side fetch via corsproxy.io (works in client browser)
+    // Attempt 2: MercadoLibre API client-side (completely open with CORS, returns high-quality regional product images)
     if (!searchSuccess) {
       try {
-        console.log('API local bloqueada o fallida. Intentando proxy alternativo (CORSProxy.io)...');
+        console.log('API local bloqueada o fallida. Intentando búsqueda en MercadoLibre...');
+        const meliUrl = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(queryText.trim())}`;
+        const meliRes = await fetch(meliUrl);
+        if (meliRes.ok) {
+          const meliData = await meliRes.json();
+          const items = meliData.results || [];
+          if (items.length > 0) {
+            data = items.map((item: any) => ({
+              // Convert to secure HTTPS and upgrade thumbnail to original high-resolution image (-O.jpg)
+              image: item.thumbnail.replace("http://", "https://").replace("-I.jpg", "-O.jpg"),
+              thumbnail: item.thumbnail.replace("http://", "https://"),
+              title: item.title
+            }));
+            searchSuccess = true;
+            console.log('Búsqueda en MercadoLibre exitosa, resultados:', items.length);
+          } else {
+            errors.push('MercadoLibre no retornó resultados para esta búsqueda');
+          }
+        } else {
+          errors.push(`MercadoLibre API retornó código ${meliRes.status}`);
+        }
+      } catch (err: any) {
+        errors.push(`MercadoLibre API falló: ${err.message}`);
+      }
+    }
+
+    // Attempt 3: Client-side fetch via corsproxy.io (works in client browser)
+    if (!searchSuccess) {
+      try {
+        console.log('API local y MercadoLibre fallidas. Intentando proxy alternativo (CORSProxy.io)...');
         const targetHtmlUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(queryText.trim())}`;
         const corsHtmlUrl = `https://corsproxy.io/?${encodeURIComponent(targetHtmlUrl)}`;
         const tokenRes = await fetch(corsHtmlUrl);
@@ -120,7 +148,7 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
       }
     }
 
-    // Attempt 3: Client-side fetch via allorigins.win (backup CORS proxy)
+    // Attempt 4: Client-side fetch via allorigins.win (backup CORS proxy)
     if (!searchSuccess) {
       try {
         console.log('Intentando proxy de respaldo (AllOrigins.win)...');
