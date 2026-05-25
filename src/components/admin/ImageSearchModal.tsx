@@ -417,7 +417,7 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
     });
   };
 
-  // Call the Imagen 3 API using the user's Gemini key
+  // Call the Imagen API using the user's Gemini key with auto-detection and fallbacks
   const handleGenerateAI = async () => {
     if (!iaPrompt.trim()) return;
     if (!apiKey) {
@@ -426,12 +426,53 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
     }
 
     setIsGenerating(true);
-    setProcessingStatus('Generando imagen con IA (Imagen 3)...');
+    setProcessingStatus('Detectando modelos disponibles y generando imagen con IA...');
     setIsProcessing(true);
     setError(null);
 
+    let targetModel = 'imagen-3.0-generate-002'; // default fallback
+    let allAvailableModels: string[] = [];
+    let detectedImagenModels: string[] = [];
+
+    // Step 1: Detect available models
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        const models = listData.models || [];
+        allAvailableModels = models.map((m: any) => m.name.replace('models/', ''));
+        
+        const predictImagenModels = models.filter((m: any) => 
+          m.name.includes('imagen') && 
+          m.supportedGenerationMethods?.includes('predict')
+        );
+
+        detectedImagenModels = models.filter((m: any) => m.name.includes('imagen')).map((m: any) => m.name.replace('models/', ''));
+
+        if (predictImagenModels.length > 0) {
+          targetModel = predictImagenModels[0].name.replace('models/', '');
+          console.log('Modelo Imagen auto-detectado con éxito:', targetModel);
+        } else {
+          // Check for any model with 'imagen'
+          const anyImagenModel = models.find((m: any) => m.name.includes('imagen'));
+          if (anyImagenModel) {
+            targetModel = anyImagenModel.name.replace('models/', '');
+            console.log('Modelo Imagen alternativo auto-detectado:', targetModel);
+          } else {
+            console.warn('No se encontraron modelos con "imagen" en los metadatos de la API.');
+          }
+        }
+      } else {
+        console.warn(`No se pudo listar modelos (status ${listRes.status}). Usando fallback por defecto.`);
+      }
+    } catch (listErr) {
+      console.error('Error al detectar modelos de la API:', listErr);
+    }
+
+    setProcessingStatus(`Generando imagen con IA usando ${targetModel}...`);
+
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:predict?key=${apiKey}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -453,8 +494,26 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Gemini Imagen 3 API Error:', errorText);
-        throw new Error(`Error de API (${response.status}): ${errorText || response.statusText}`);
+        console.error('Gemini Imagen API Error:', errorText);
+
+        // Parse API error message to show a user-friendly response
+        let apiMessage = '';
+        try {
+          const apiErrorJson = JSON.parse(errorText);
+          apiMessage = apiErrorJson.error?.message || '';
+        } catch (e) {}
+
+        if (response.status === 404 || apiMessage.toLowerCase().includes('not found') || apiMessage.toLowerCase().includes('not supported')) {
+          if (detectedImagenModels.length > 0) {
+            throw new Error(`El modelo ${targetModel} no es soportado. Modelos Imagen disponibles en tu clave: ${detectedImagenModels.join(', ')}`);
+          } else if (allAvailableModels.length > 0) {
+            throw new Error(`Tu clave de API no tiene acceso a ningún modelo Imagen de generación. Modelos disponibles: ${allAvailableModels.slice(0, 10).join(', ')}...`);
+          } else {
+            throw new Error(`Modelo ${targetModel} no encontrado o no soportado. Por favor, verifica los permisos y región de tu API Key.`);
+          }
+        }
+
+        throw new Error(apiMessage || `Error de API (${response.status}): ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -473,17 +532,7 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
       onClose();
     } catch (err: any) {
       console.error('Error generating AI image:', err);
-      let displayError = err.message || 'Error de conexión con la API.';
-      if (displayError.includes('{')) {
-        try {
-          const jsonStart = displayError.indexOf('{');
-          const errorJson = JSON.parse(displayError.substring(jsonStart));
-          if (errorJson.error?.message) {
-            displayError = errorJson.error.message;
-          }
-        } catch (e) {}
-      }
-      setError(`Error al generar con IA: ${displayError}`);
+      setError(`Error al generar con IA: ${err.message || 'Error de conexión con la API.'}`);
     } finally {
       setIsGenerating(false);
       setIsProcessing(false);
