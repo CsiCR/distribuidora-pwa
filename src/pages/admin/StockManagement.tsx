@@ -20,6 +20,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
+import { ImageSearchModal } from '../../components/admin/ImageSearchModal';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -141,6 +142,7 @@ const StockManagement: React.FC = () => {
   const [editUnitMeasure, setEditUnitMeasure] = useState('');
   const [editObservations, setEditObservations] = useState('');
   const [editImageUrl, setEditImageUrl] = useState('');
+  const [isImageSearchModalOpen, setIsImageSearchModalOpen] = useState(false);
   
 
 
@@ -856,17 +858,7 @@ const StockManagement: React.FC = () => {
                     <div className="flex gap-2">
                       <button 
                         type="button"
-                        onClick={() => {
-                          const cat = editCategory.toLowerCase();
-                          let mockUrl = 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400';
-                          if (cat.includes('cerveza')) mockUrl = 'https://images.unsplash.com/photo-1571613316887-6f8d5cbf7ef7?w=400';
-                          else if (cat.match(/bebida|gaseosa|jugo/)) mockUrl = 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400';
-                          else if (cat.match(/librería|libreria|papel/)) mockUrl = 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=400';
-                          else if (cat.includes('limpieza')) mockUrl = 'https://images.unsplash.com/photo-1585421514738-ee1a3b2e5fe2?w=400';
-                          
-                          setEditImageUrl(mockUrl);
-                          alert(`Se sugirió una foto web para "${editName}".`);
-                        }}
+                        onClick={() => setIsImageSearchModalOpen(true)}
                         className="bg-brand-wine/40 border border-brand-wine/50 hover:bg-brand-wine text-white px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap"
                       >
                         🔍 Buscar Web
@@ -874,17 +866,7 @@ const StockManagement: React.FC = () => {
                       
                       <button 
                         type="button"
-                        onClick={() => {
-                          const cat = editCategory.toLowerCase();
-                          let mockUrl = 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400';
-                          if (cat.includes('cerveza')) mockUrl = 'https://images.unsplash.com/photo-1567696911980-2eed69a46042?w=400';
-                          else if (cat.match(/bebida|gaseosa|jugo/)) mockUrl = 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400';
-                          else if (cat.match(/librería|libreria|papel/)) mockUrl = 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=400';
-                          else if (cat.includes('limpieza')) mockUrl = 'https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=400';
-                          
-                          setEditImageUrl(mockUrl);
-                          alert("Archivo local cargado con éxito (Simulado).");
-                        }}
+                        onClick={() => setIsImageSearchModalOpen(true)}
                         className="bg-brand-gold/10 border border-brand-gold/20 hover:bg-brand-gold hover:text-brand-black text-brand-gold px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap"
                       >
                         📁 Subir Foto
@@ -1111,6 +1093,15 @@ const StockManagement: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ImageSearchModal
+        isOpen={isImageSearchModalOpen}
+        onClose={() => setIsImageSearchModalOpen(false)}
+        onSelectImage={(url) => setEditImageUrl(url)}
+        productName={editName}
+        category={editCategory}
+        currentImageUrl={editImageUrl}
+      />
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">

@@ -16,11 +16,7 @@ import {
   Loader2,
   Phone,
   Settings,
-  Image as ImageIcon,
-  Trash2,
-  Search,
-  Plus,
-  X
+  Image as ImageIcon
 } from 'lucide-react';
 import { useStockStore, type Product } from '../../store/useStockStore';
 import { useClientsStore, type Client } from '../../store/useClientsStore';
@@ -29,6 +25,7 @@ import { useOrdersStore, type Order } from '../../store/useOrdersStore';
 import { useTransactionsStore, type Transaction } from '../../store/useTransactionsStore';
 import { cn } from '../../lib/utils';
 import { ProductImage } from '../../components/ProductImage';
+import { ImageSearchModal } from '../../components/admin/ImageSearchModal';
 
 const WAREHOUSES = [
   'Deposito Central',
@@ -234,7 +231,6 @@ export const Copilot: React.FC = () => {
 
   const [selectedRows, setSelectedRows] = useState<Record<number, boolean>>({});
   const [activeImageSearchIdx, setActiveImageSearchIdx] = useState<number | null>(null);
-  const [customImageUrl, setCustomImageUrl] = useState('');
 
   // Inicializar selección al cambiar los productos leídos de la factura
   useEffect(() => {
@@ -1594,7 +1590,7 @@ Devuelve un JSON estrictamente con el siguiente esquema y sin marcas de markdown
                               <ProductImage imageUrl={prod.image_url} category={prod.category} className="w-full h-full object-cover" disableZoom />
                               <button 
                                 type="button" 
-                                onClick={() => { setActiveImageSearchIdx(idx); setCustomImageUrl(prod.image_url || ''); }} 
+                                onClick={() => { setActiveImageSearchIdx(idx); }} 
                                 className="absolute inset-0 bg-brand-black/85 flex flex-col items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] font-bold text-brand-gold cursor-pointer"
                               >
                                 <ImageIcon size={14} /> Cambiar
@@ -1871,159 +1867,15 @@ Devuelve un JSON estrictamente con el siguiente esquema y sin marcas de markdown
       )}
 
       {/* Modal de Búsqueda de Imagen para Copiloto */}
-      {activeImageSearchIdx !== null && (
-        <div className="fixed inset-0 bg-brand-black/90 backdrop-blur-md z-[1000] flex items-center justify-center p-4">
-          <div className="bg-brand-black border border-brand-charcoal rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
-            <div className="p-6 border-b border-brand-charcoal bg-brand-wine/10 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <ImageIcon className="text-brand-gold" size={24} />
-                <div>
-                  <h3 className="text-lg font-bold text-brand-smoke uppercase tracking-wide">Buscar Imagen de Producto</h3>
-                  <p className="text-[10px] text-brand-steel font-medium">Asignar una foto para el catálogo y la terminal</p>
-                </div>
-              </div>
-              <button 
-                type="button" 
-                onClick={() => setActiveImageSearchIdx(null)}
-                className="p-1 hover:bg-brand-charcoal rounded-full text-brand-steel hover:text-white transition-colors cursor-pointer"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
-              {/* Opción A: Sugerencias Web (Simuladas en base a la categoría) */}
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-brand-gold uppercase tracking-widest flex items-center gap-1.5">
-                  <Search size={12} /> Fotos Encontradas en la Web (Sugerido)
-                </h4>
-                <div className="grid grid-cols-3 gap-3">
-                  {((activeImageSearchIdx !== null && invoiceItemsToProcess[activeImageSearchIdx])
-                    ? (
-                        invoiceItemsToProcess[activeImageSearchIdx].category.toLowerCase().includes('cerveza') ? [
-                          'https://images.unsplash.com/photo-1600788886242-5c96aabe3757?w=400&auto=format&fit=crop&q=80',
-                          'https://images.unsplash.com/photo-1567696911980-2eed69a46042?w=400&auto=format&fit=crop&q=80',
-                          'https://images.unsplash.com/photo-1571613316887-6f8d5cbf7ef7?w=400&auto=format&fit=crop&q=80'
-                        ] :
-                        invoiceItemsToProcess[activeImageSearchIdx].category.toLowerCase().match(/bebida|gaseosa|jugo/) ? [
-                          'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400&auto=format&fit=crop&q=80',
-                          'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400&auto=format&fit=crop&q=80',
-                          'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400&auto=format&fit=crop&q=80'
-                        ] :
-                        invoiceItemsToProcess[activeImageSearchIdx].category.toLowerCase().match(/librería|libreria|papel/) ? [
-                          'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=400&auto=format&fit=crop&q=80',
-                          'https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=400&auto=format&fit=crop&q=80',
-                          'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&auto=format&fit=crop&q=80'
-                        ] :
-                        invoiceItemsToProcess[activeImageSearchIdx].category.toLowerCase().includes('limpieza') ? [
-                          'https://images.unsplash.com/photo-1585421514738-ee1a3b2e5fe2?w=400&auto=format&fit=crop&q=80',
-                          'https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=400&auto=format&fit=crop&q=80',
-                          'https://images.unsplash.com/photo-1563453392212-326f5e854473?w=400&auto=format&fit=crop&q=80'
-                        ] : [
-                          'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&auto=format&fit=crop&q=80',
-                          'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=400&auto=format&fit=crop&q=80',
-                          'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=400&auto=format&fit=crop&q=80'
-                        ]
-                      )
-                    : []
-                  ).map((url: string, i: number) => (
-                    <div 
-                      key={i} 
-                      onClick={() => {
-                        handleEditItem(activeImageSearchIdx, 'image_url', url);
-                        setActiveImageSearchIdx(null);
-                      }}
-                      className="group relative aspect-square rounded-2xl overflow-hidden border border-brand-charcoal hover:border-brand-gold cursor-pointer bg-brand-charcoal/20 transition-all duration-300 transform hover:scale-105 flex items-center justify-center"
-                    >
-                      <img src={url} alt="Search result" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-brand-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all text-xs font-black text-brand-gold">
-                        Seleccionar
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Opción B: Copiar y pegar URL directa */}
-              <div className="space-y-2 pt-2 border-t border-brand-charcoal/40">
-                <h4 className="text-[10px] font-black text-brand-gold uppercase tracking-widest flex items-center gap-1.5">
-                  <Plus size={12} /> Pegar URL de Imagen
-                </h4>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    value={customImageUrl}
-                    onChange={(e) => setCustomImageUrl(e.target.value)}
-                    placeholder="https://ejemplo.com/imagen-del-producto.jpg"
-                    className="flex-1 bg-brand-charcoal/40 border border-brand-charcoal rounded-xl px-4 py-2 text-xs text-brand-smoke focus:outline-none focus:border-brand-gold/40 transition-colors"
-                  />
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      if (customImageUrl.trim()) {
-                        handleEditItem(activeImageSearchIdx, 'image_url', customImageUrl.trim());
-                        setActiveImageSearchIdx(null);
-                      }
-                    }}
-                    className="bg-brand-gold text-brand-black hover:bg-brand-gold/80 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
-                  >
-                    Asignar
-                  </button>
-                </div>
-              </div>
-
-              {/* Opción C: Subir Archivo local (Simulado) */}
-              <div className="space-y-2 pt-2 border-t border-brand-charcoal/40">
-                <h4 className="text-[10px] font-black text-brand-gold uppercase tracking-widest flex items-center gap-1.5">
-                  <Upload size={12} /> Cargar Foto Local
-                </h4>
-                <div 
-                  onClick={() => {
-                    const cat = invoiceItemsToProcess[activeImageSearchIdx]?.category.toLowerCase() || '';
-                    let mockUploadUrl = 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400';
-                    if (cat.includes('cerveza')) mockUploadUrl = 'https://images.unsplash.com/photo-1571613316887-6f8d5cbf7ef7?w=400';
-                    else if (cat.match(/bebida|gaseosa|jugo/)) mockUploadUrl = 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400';
-                    else if (cat.match(/librería|libreria|papel/)) mockUploadUrl = 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=400';
-                    else if (cat.includes('limpieza')) mockUploadUrl = 'https://images.unsplash.com/photo-1585421514738-ee1a3b2e5fe2?w=400';
-                    
-                    handleEditItem(activeImageSearchIdx, 'image_url', mockUploadUrl);
-                    alert("Foto cargada con éxito (Simulada).");
-                    setActiveImageSearchIdx(null);
-                  }}
-                  className="border-2 border-dashed border-brand-charcoal hover:border-brand-gold/50 rounded-2xl p-6 text-center cursor-pointer transition-all hover:bg-brand-charcoal/10"
-                >
-                  <Upload className="mx-auto text-brand-steel mb-2" size={24} />
-                  <p className="text-xs text-brand-smoke font-bold">Haz clic para buscar o arrastra una imagen aquí</p>
-                  <p className="text-[9px] text-brand-steel mt-1">Soporta PNG, JPG, JPEG (Máx 5MB)</p>
-                </div>
-              </div>
-
-              {/* Opción D: Borrar imagen para usar el fallback de categoría */}
-              <div className="pt-2 border-t border-brand-charcoal/40 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleEditItem(activeImageSearchIdx, 'image_url', '');
-                    setActiveImageSearchIdx(null);
-                  }}
-                  className="text-xs text-rose-400 font-bold hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <Trash2 size={12} /> Limpiar imagen y usar placeholder de categoría
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 bg-brand-charcoal/20 border-t border-brand-charcoal flex justify-end">
-              <button 
-                type="button"
-                onClick={() => setActiveImageSearchIdx(null)}
-                className="px-5 py-2 border border-brand-charcoal hover:border-brand-smoke/30 text-brand-smoke rounded-xl text-xs font-bold uppercase tracking-widest transition-colors cursor-pointer"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+      {activeImageSearchIdx !== null && invoiceItemsToProcess[activeImageSearchIdx] && (
+        <ImageSearchModal
+          isOpen={activeImageSearchIdx !== null}
+          onClose={() => setActiveImageSearchIdx(null)}
+          onSelectImage={(url) => handleEditItem(activeImageSearchIdx, 'image_url', url)}
+          productName={invoiceItemsToProcess[activeImageSearchIdx].name}
+          category={invoiceItemsToProcess[activeImageSearchIdx].category}
+          currentImageUrl={invoiceItemsToProcess[activeImageSearchIdx].image_url}
+        />
       )}
 
     </div>
