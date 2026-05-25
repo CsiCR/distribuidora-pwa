@@ -363,6 +363,11 @@ const RecessTerminal: React.FC = () => {
       triggerNotification(`¡Venta #${res.orderId} realizada con éxito!`, 'success');
       setShowCheckoutModal(false);
       setCashInputAmount('0');
+
+      // Auto-sync order to Supabase immediately in the background if online
+      if (supabaseStatus === 'connected' && !isOfflineMode) {
+        syncPendingSales().catch(err => console.error('Error auto-syncing recess sale:', err));
+      }
     } else {
       triggerNotification('Error al procesar la venta. El carrito está vacío.', 'error');
     }
