@@ -300,6 +300,7 @@ export const useOfflineSalesStore = create<OfflineSalesState>()(
       
       syncPendingSales: async () => {
         const pending = get().offlineOrders.filter(o => !o.synced);
+        const pendingIds = pending.map(o => o.id);
         
         if (pending.length > 0) {
           const ordersStore = useOrdersStore.getState();
@@ -329,8 +330,8 @@ export const useOfflineSalesStore = create<OfflineSalesState>()(
         // Push all updated local caches (stocks, client balances, transactions, audit logs) to Supabase
         await SupabaseSyncService.pushAllLocalData();
         
-        // Pull latest database state to remain synchronized
-        await SupabaseSyncService.syncAll();
+        // Pull latest database state to remain synchronized (exclude just-synced orders since they are already saved remotelly)
+        await SupabaseSyncService.syncAll(pendingIds);
         
         // Clear synced items to keep store light
         set((state) => ({

@@ -1,8 +1,11 @@
 import { supabase } from '../lib/supabase';
 import { useStockStore } from '../store/useStockStore';
+import type { AuditLog } from '../store/useStockStore';
 import { useClientsStore } from '../store/useClientsStore';
 import { useOrdersStore } from '../store/useOrdersStore';
+import type { Order } from '../store/useOrdersStore';
 import { useTransactionsStore } from '../store/useTransactionsStore';
+import type { Transaction } from '../store/useTransactionsStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useProvidersStore } from '../store/useProvidersStore';
 import { useOfflineSalesStore } from '../store/useOfflineSalesStore';
@@ -49,7 +52,7 @@ export const SupabaseSyncService = {
   },
 
   // Pull all data from Supabase to hydrate local stores
-  async syncAll(): Promise<boolean> {
+  async syncAll(excludeOrderIds?: string[]): Promise<boolean> {
     try {
       const isConnected = await this.checkConnection();
       if (!isConnected) {
@@ -63,6 +66,24 @@ export const SupabaseSyncService = {
       const { data: products, error: prodErr } = await supabase.from('products').select('*');
       if (!prodErr && products) {
         const appProducts = products.map(mapDbProductToApp);
+
+        // Apply offline pending stock decrements
+        const offlineOrders = useOfflineSalesStore.getState().offlineOrders || [];
+        const pendingOrders = offlineOrders.filter(o => 
+          !o.synced && (!excludeOrderIds || !excludeOrderIds.includes(o.id))
+        );
+        
+        if (pendingOrders.length > 0) {
+          pendingOrders.forEach(order => {
+            order.items.forEach(item => {
+              const prod = appProducts.find(p => p.id === item.id);
+              if (prod) {
+                prod.stock_actual = prod.stock_actual - item.quantity;
+              }
+            });
+          });
+        }
+
         useStockStore.getState().setProducts(appProducts);
       }
 
@@ -70,6 +91,24 @@ export const SupabaseSyncService = {
       const { data: clients, error: cliErr } = await supabase.from('clients').select('*');
       if (!cliErr && clients) {
         const appClients = clients.map(mapDbClientToApp);
+
+        // Apply offline pending client balance adjustments (debit Cta Cte)
+        const offlineOrders = useOfflineSalesStore.getState().offlineOrders || [];
+        const pendingOrders = offlineOrders.filter(o => 
+          !o.synced && (!excludeOrderIds || !excludeOrderIds.includes(o.id))
+        );
+        
+        if (pendingOrders.length > 0) {
+          pendingOrders.forEach(order => {
+            if (order.client_id && order.credit_amount > 0) {
+              const client = appClients.find(c => c.id === order.client_id);
+              if (client) {
+                client.balance = client.balance - order.credit_amount;
+              }
+            }
+          });
+        }
+
         useClientsStore.getState().setClients(appClients);
       }
 
@@ -92,7 +131,7 @@ export const SupabaseSyncService = {
       const { data: orders, error: ordErr } = await supabase.from('orders').select('*');
       const { data: orderItems, error: itemsErr } = await supabase.from('order_items').select('*');
       if (!ordErr && orders && !itemsErr && orderItems) {
-        const appOrders = orders.map((o: any) => {
+        const appOrders: Order[] = orders.map((o: any): Order => {
           const items = orderItems
             .filter((item: any) => item.order_id === o.id)
             .map((item: any) => ({
@@ -103,40 +142,123 @@ export const SupabaseSyncService = {
             }));
           return {
             id: o.id,
-            client_id: o.client_id,
+            client_id: o.client_id || undefined,
             client_name: o.client_name,
             date: o.date,
             total: Number(o.total),
-            status: o.status,
-            tax_condition: o.tax_condition,
-            invoice_type: o.invoice_type,
+            status: o.status as Order['status'],
+            tax_condition: o.tax_condition || undefined,
+            invoice_type: o.invoice_type ? (o.invoice_type as 'A' | 'B') : undefined,
             net_amount: o.net_amount ? Number(o.net_amount) : undefined,
             iva_amount: o.iva_amount ? Number(o.iva_amount) : undefined,
-            observations: o.observations,
+            observations: o.observations || undefined,
             items
           };
         });
+
+        // Preserve offline pending and just-synced orders
+        const localOrders = useOrdersStore.getState().orders || [];
+        const pendingOrders = useOfflineSalesStore.getState().offlineOrders || [];
+        const pendingUnsynced = pendingOrders.filter(o => 
+          !o.synced && (!excludeOrderIds || !excludeOrderIds.includes(o.id))
+        );
+        
+        const idsToPreserve = new Set([
+          ...pendingUnsynced.map(o => o.id),
+          ...(excludeOrderIds || [])
+        ]);
+
+        idsToPreserve.forEach(id => {
+          const exists = appOrders.some(o => o.id === id);
+          if (!exists) {
+            const localOrd = localOrders.find(o => o.id === id);
+            if (localOrd) {
+              appOrders.push(localOrd);
+            } else {
+              // Reconstruct order representation from offline queue if missing
+              const offOrd = pendingOrders.find(o => o.id === id);
+              if (offOrd) {
+                appOrders.push({
+                  id: offOrd.id,
+                  client_id: offOrd.client_id,
+                  client_name: offOrd.client_name,
+                  date: offOrd.date,
+                  total: offOrd.total,
+                  status: 'Entregado',
+                  items: offOrd.items.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: item.price
+                  })),
+                  observations: `Venta de Recreo. Modo de cobro: ${offOrd.payment_method}`
+                });
+              }
+            }
+          }
+        });
+
         useOrdersStore.getState().setOrders(appOrders);
       }
 
       // 5. Sync Transactions
       const { data: transactions, error: txErr } = await supabase.from('transactions').select('*');
       if (!txErr && transactions) {
-        const appTransactions = transactions.map((t: any) => ({
+        const appTransactions: Transaction[] = transactions.map((t: any): Transaction => ({
           id: t.id,
           client_id: t.client_id,
-          type: t.type,
+          type: t.type as Transaction['type'],
           reference: t.reference,
           amount: Number(t.amount),
           date: t.date,
-          status: t.status,
-          payment_method: t.payment_method,
-          notes: t.notes,
-          tax_condition: t.tax_condition,
-          invoice_type: t.invoice_type,
+          status: t.status as Transaction['status'],
+          payment_method: t.payment_method ? (t.payment_method as Transaction['payment_method']) : undefined,
+          notes: t.notes || undefined,
+          tax_condition: t.tax_condition || undefined,
+          invoice_type: t.invoice_type ? (t.invoice_type as 'A' | 'B') : undefined,
           net_amount: t.net_amount ? Number(t.net_amount) : undefined,
           iva_amount: t.iva_amount ? Number(t.iva_amount) : undefined
         }));
+
+        // Preserve offline pending transactions
+        const offlineOrders = useOfflineSalesStore.getState().offlineOrders || [];
+        const pendingOrders = offlineOrders.filter(o => 
+          !o.synced && (!excludeOrderIds || !excludeOrderIds.includes(o.id))
+        );
+
+        if (pendingOrders.length > 0) {
+          const clients = useClientsStore.getState().clients || [];
+          pendingOrders.forEach(order => {
+            if (order.client_id && order.credit_amount > 0) {
+              const exists = appTransactions.some(tx => tx.reference === order.id);
+              if (!exists) {
+                const client = clients.find(c => c.id === order.client_id);
+                if (client) {
+                  const isFacturaA = client.tax_condition === 'Responsable Inscripto';
+                  const net_amount = parseFloat((order.credit_amount / 1.21).toFixed(2));
+                  const iva_amount = parseFloat((order.credit_amount - net_amount).toFixed(2));
+                  
+                  appTransactions.push({
+                    id: `TX-${order.id}`,
+                    client_id: order.client_id,
+                    type: 'FACTURA',
+                    reference: order.id,
+                    amount: order.credit_amount,
+                    date: order.date,
+                    status: 'PENDIENTE',
+                    payment_method: 'CREDITO',
+                    notes: `Venta Modo Recreo ${order.id} (Cta Cte)`,
+                    tax_condition: client.tax_condition,
+                    invoice_type: isFacturaA ? 'A' : 'B',
+                    net_amount,
+                    iva_amount
+                  });
+                }
+              }
+            }
+          });
+        }
+
         useTransactionsStore.getState().setTransactions(appTransactions);
       }
 
@@ -185,20 +307,40 @@ export const SupabaseSyncService = {
       // 7. Sync Audit Logs
       const { data: auditLogs, error: auditErr } = await supabase.from('stock_audit_logs').select('*');
       if (!auditErr && auditLogs) {
-        const appLogs = auditLogs.map((l: any) => ({
+        const appLogs: AuditLog[] = auditLogs.map((l: any): AuditLog => ({
           id: l.id,
-          item_id: l.item_id,
+          item_id: l.item_id || undefined,
           item_name: l.item_name,
-          type: l.type,
+          type: l.type as AuditLog['type'],
           quantity: l.quantity ? Number(l.quantity) : undefined,
-          old_value: l.old_value,
-          new_value: l.new_value,
-          warehouse_source: l.warehouse_source,
-          warehouse_dest: l.warehouse_dest,
+          old_value: l.old_value || undefined,
+          new_value: l.new_value || undefined,
+          warehouse_source: l.warehouse_source || undefined,
+          warehouse_dest: l.warehouse_dest || undefined,
           reason: l.reason,
           timestamp: l.timestamp,
           user: l.user_name
         }));
+
+        // Preserve offline pending audit logs
+        const offlineOrders = useOfflineSalesStore.getState().offlineOrders || [];
+        const pendingOrders = offlineOrders.filter(o => 
+          !o.synced && (!excludeOrderIds || !excludeOrderIds.includes(o.id))
+        );
+
+        if (pendingOrders.length > 0) {
+          const localLogs = useStockStore.getState().auditLogs || [];
+          pendingOrders.forEach(order => {
+            const orderLogs = localLogs.filter(log => log.reason?.includes(order.id));
+            orderLogs.forEach(log => {
+              const exists = appLogs.some(l => l.id === log.id);
+              if (!exists) {
+                appLogs.push(log);
+              }
+            });
+          });
+        }
+
         useStockStore.setState({ auditLogs: appLogs });
       }
 
