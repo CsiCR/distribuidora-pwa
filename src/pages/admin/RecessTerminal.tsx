@@ -9,6 +9,7 @@ import {
   X, 
   ShoppingCart, 
   User, 
+  UserPlus,
   Search, 
   Sparkles, 
   Coins, 
@@ -65,6 +66,14 @@ const RecessTerminal: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [checkoutStudentSearchQuery, setCheckoutStudentSearchQuery] = useState<string>('');
   const [showCheckoutSearchDropdown, setShowCheckoutSearchDropdown] = useState<boolean>(false);
+
+  // Quick Client Creation Modal State
+  const [showQuickCreateModal, setShowQuickCreateModal] = useState<boolean>(false);
+  const [quickCreateName, setQuickCreateName] = useState<string>('');
+  const [quickCreateFantasy, setQuickCreateFantasy] = useState<string>('');
+  const [quickCreateCredential, setQuickCreateCredential] = useState<string>('');
+  const [quickCreateCreditLimit, setQuickCreateCreditLimit] = useState<number>(15000);
+  const [quickCreateIsCheckout, setQuickCreateIsCheckout] = useState<boolean>(false);
 
   // Mixed payment detailed states
   const [mixedCashPortion, setMixedCashPortion] = useState<string>('0');
@@ -215,7 +224,7 @@ const RecessTerminal: React.FC = () => {
     if (!checkoutStudentSearchQuery.trim()) return [];
     return clients.filter(c => {
       const term = checkoutStudentSearchQuery.toLowerCase();
-      const isSchoolStudent = c.zone === 'Colegio San Martin' || c.id.startsWith('student_') || c.id.startsWith('teacher_');
+      const isSchoolStudent = c.zone === 'Recreo' || c.id.startsWith('student_') || c.id.startsWith('teacher_');
       if (!isSchoolStudent) return false;
       return (
         (c.name || '').toLowerCase().includes(term) ||
@@ -232,6 +241,70 @@ const RecessTerminal: React.FC = () => {
     setCheckoutStudentSearchQuery('');
     setShowCheckoutSearchDropdown(false);
     triggerNotification(`Asociado a ${student.fantasy_name || student.name}`);
+  };
+
+  const handleOpenQuickCreateModal = (query: string, isCheckout: boolean = false) => {
+    const titleCaseName = query
+      .trim()
+      .split(' ')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+    
+    setQuickCreateName(titleCaseName);
+    setQuickCreateFantasy('');
+    setQuickCreateCredential('');
+    setQuickCreateCreditLimit(15000);
+    setQuickCreateIsCheckout(isCheckout);
+    setShowQuickCreateModal(true);
+  };
+
+  const handleQuickCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickCreateName.trim()) return;
+
+    const { clients, setClients } = useClientsStore.getState();
+    
+    const newId = `student_${Math.random().toString(36).substr(2, 9)}`;
+    const defaultCuit = `STUD-${Math.floor(1000 + Math.random() * 9000)}`;
+    const finalCredential = quickCreateCredential.trim() || `STUD-${Math.floor(100000 + Math.random() * 900000)}`;
+    
+    const newClient: Client = {
+      id: newId,
+      name: quickCreateName.trim(),
+      fantasy_name: quickCreateFantasy.trim() || `${quickCreateName.trim()} (Recreo)`,
+      cuit: defaultCuit,
+      email: `${quickCreateName.trim().toLowerCase().replace(/\s+/g, '')}@colegio.edu.ar`,
+      phone: '',
+      address: 'Recreo',
+      city: 'CABA',
+      zone: 'Recreo',
+      price_list: 'Minorista',
+      visit_days: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'],
+      status: 'Activo',
+      balance: 0,
+      tax_condition: 'Consumidor Final',
+      credit_limit: quickCreateCreditLimit,
+      credential_id: finalCredential
+    };
+
+    setClients([newClient, ...clients]);
+
+    // Automatically select the newly created student
+    updateCartClient(activeCartId, newClient.id);
+    const firstName = newClient.name.split(' ')[0];
+    updateCartName(activeCartId, firstName);
+
+    // Reset search queries
+    if (quickCreateIsCheckout) {
+      setCheckoutStudentSearchQuery('');
+      setShowCheckoutSearchDropdown(false);
+    } else {
+      setStudentSearchQuery('');
+      setShowSearchDropdown(false);
+    }
+
+    setShowQuickCreateModal(false);
+    triggerNotification(`Cliente ${newClient.name} creado y asociado con éxito.`);
   };
 
   // QWERTY visual keyboard helper
@@ -281,23 +354,30 @@ const RecessTerminal: React.FC = () => {
           <button
             type="button"
             onClick={handleClear}
-            className="flex-[1.5] h-8 rounded bg-brand-wine/20 border border-brand-wine/30 text-[9px] font-black text-brand-wine uppercase tracking-wider active:scale-90 transition-all cursor-pointer flex items-center justify-center"
+            className="flex-[1.2] h-8 rounded bg-brand-wine/20 border border-brand-wine/30 text-[9px] font-black text-brand-wine uppercase tracking-wider active:scale-90 transition-all cursor-pointer flex items-center justify-center"
           >
             Limpiar
           </button>
           <button
             type="button"
             onClick={() => handleKeyPress(' ')}
-            className="flex-[4] h-8 rounded bg-brand-charcoal/50 border border-brand-charcoal text-[10px] font-bold text-brand-steel uppercase tracking-widest active:scale-90 transition-all cursor-pointer flex items-center justify-center"
+            className="flex-[3] h-8 rounded bg-brand-charcoal/50 border border-brand-charcoal text-[10px] font-bold text-brand-steel uppercase tracking-widest active:scale-90 transition-all cursor-pointer flex items-center justify-center"
           >
             Espacio
           </button>
           <button
             type="button"
             onClick={handleBackspace}
-            className="flex-[1.5] h-8 rounded bg-brand-wine/20 border border-brand-wine/30 text-[11px] font-black text-brand-wine active:scale-90 transition-all cursor-pointer flex items-center justify-center"
+            className="flex-[1.2] h-8 rounded bg-brand-wine/20 border border-brand-wine/30 text-[11px] font-black text-brand-wine active:scale-90 transition-all cursor-pointer flex items-center justify-center"
           >
             ⌫
+          </button>
+          <button
+            type="button"
+            onClick={() => setDropdown(false)}
+            className="flex-[1.8] h-8 rounded bg-brand-gold text-brand-black border border-brand-gold text-[9px] font-black uppercase tracking-wider active:scale-90 transition-all cursor-pointer flex items-center justify-center"
+          >
+            Enter
           </button>
         </div>
       </div>
@@ -329,7 +409,7 @@ const RecessTerminal: React.FC = () => {
     if (!studentSearchQuery.trim()) return [];
     return clients.filter(c => {
       const term = studentSearchQuery.toLowerCase();
-      const isSchoolStudent = c.zone === 'Colegio San Martin' || c.id.startsWith('student_') || c.id.startsWith('teacher_');
+      const isSchoolStudent = c.zone === 'Recreo' || c.id.startsWith('student_') || c.id.startsWith('teacher_');
       if (!isSchoolStudent) return false;
       return (
         (c.name || '').toLowerCase().includes(term) ||
@@ -918,8 +998,15 @@ const RecessTerminal: React.FC = () => {
                     </div>
                   )}
                   {showSearchDropdown && studentSearchQuery.trim() && filteredStudentsSuggestions.length === 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-brand-graphite border border-brand-charcoal rounded-xl p-3 text-center text-xs text-brand-steel z-50">
-                      Sin coincidencias para "{studentSearchQuery}"
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-brand-graphite border border-brand-charcoal rounded-xl p-3 text-center text-xs text-brand-steel z-50 flex flex-col items-center gap-2 animate-in fade-in zoom-in-95 duration-150 shadow-2xl">
+                      <span>Sin coincidencias para "{studentSearchQuery}"</span>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenQuickCreateModal(studentSearchQuery, false)}
+                        className="w-full mt-1 bg-brand-gold text-brand-black text-[10px] font-black uppercase tracking-wider py-2 rounded-lg hover:bg-brand-gold/90 transition-colors active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                      >
+                        <UserPlus size={14} /> Alta de cliente
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1144,6 +1231,18 @@ const RecessTerminal: React.FC = () => {
                                     </span>
                                   </div>
                                 ))}
+                              </div>
+                            )}
+                            {showCheckoutSearchDropdown && checkoutStudentSearchQuery.trim() && filteredCheckoutStudentsSuggestions.length === 0 && (
+                              <div className="absolute top-11 left-0 right-0 mt-1 bg-brand-graphite border border-brand-charcoal rounded-xl p-3 text-center text-xs text-brand-steel z-50 flex flex-col items-center gap-2 animate-in fade-in zoom-in-95 duration-150 shadow-2xl">
+                                <span>Sin coincidencias para "{checkoutStudentSearchQuery}"</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenQuickCreateModal(checkoutStudentSearchQuery, true)}
+                                  className="w-full mt-1 bg-brand-gold text-brand-black text-[10px] font-black uppercase tracking-wider py-2 rounded-lg hover:bg-brand-gold/90 transition-colors active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                                >
+                                  <UserPlus size={14} /> Alta de cliente
+                                </button>
                               </div>
                             )}
                           </div>
@@ -1410,6 +1509,94 @@ const RecessTerminal: React.FC = () => {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Client Creation Modal */}
+      {showQuickCreateModal && (
+        <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in">
+          <div 
+            className="glass-card max-w-md w-full p-6 border-brand-gold/30 shadow-2xl flex flex-col gap-4 animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center border-b border-brand-charcoal pb-3">
+              <h3 className="text-sm font-display font-bold text-brand-gold uppercase flex items-center gap-2">
+                <UserPlus size={16} /> Alta Rápida de Cliente (Recreo)
+              </h3>
+              <button 
+                onClick={() => setShowQuickCreateModal(false)}
+                className="p-1 hover:bg-brand-charcoal text-brand-steel hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickCreateSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-black text-brand-steel tracking-widest block">Nombre y Apellido *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Belen Gomez"
+                  className="w-full input-field py-2 text-xs"
+                  value={quickCreateName}
+                  onChange={(e) => setQuickCreateName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-black text-brand-steel tracking-widest block">Curso / Grado / Detalle</label>
+                <input
+                  type="text"
+                  placeholder="Ej: 5to Grado B / Docente"
+                  className="w-full input-field py-2 text-xs"
+                  value={quickCreateFantasy}
+                  onChange={(e) => setQuickCreateFantasy(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-black text-brand-steel tracking-widest block">Nro Credencial / DNI</label>
+                <div className="relative">
+                  <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-steel" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Escanear tarjeta o ingresar manual"
+                    className="w-full input-field pl-9 py-2 text-xs"
+                    value={quickCreateCredential}
+                    onChange={(e) => setQuickCreateCredential(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-black text-brand-steel tracking-widest block">Límite de Crédito ($)</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="w-full input-field py-2 text-xs font-mono"
+                  value={quickCreateCreditLimit}
+                  onChange={(e) => setQuickCreateCreditLimit(Number(e.target.value))}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowQuickCreateModal(false)}
+                  className="flex-1 py-2 bg-brand-charcoal text-brand-steel border border-brand-charcoal rounded-xl text-xs font-bold uppercase tracking-wider active:scale-95 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-brand-gold text-brand-black border border-brand-gold rounded-xl text-xs font-black uppercase tracking-wider active:scale-95 transition-all cursor-pointer"
+                >
+                  Guardar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

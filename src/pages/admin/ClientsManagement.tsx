@@ -43,7 +43,7 @@ interface Client {
   tax_condition: 'Responsable Inscripto' | 'Monotributista' | 'Consumidor Final' | 'Exento';
 }
 
-const ZONES = ['Zona Norte', 'Zona Sur', 'Centro', 'Periferia', 'Interior'];
+const ZONES = ['Zona Norte', 'Zona Sur', 'Centro', 'Periferia', 'Interior', 'Recreo'];
 const PRICE_LISTS = ['Minorista', 'Mayorista', 'Distribuidor'];
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
