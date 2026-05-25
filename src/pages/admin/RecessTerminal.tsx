@@ -1034,7 +1034,7 @@ const RecessTerminal: React.FC = () => {
             <button
               disabled={cartTotal === 0}
               onClick={() => {
-                setCheckoutMethod('Efectivo');
+                setCheckoutMethod(selectedStudent ? 'Cuenta Corriente' : 'Efectivo');
                 setCashInputAmount(cartTotal.toString());
                 setShowCheckoutModal(true);
               }}

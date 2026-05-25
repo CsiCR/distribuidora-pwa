@@ -14,14 +14,36 @@ import {
   ArrowLeft,
   Bot,
   Truck,
-  Zap
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { SupabaseSyncService } from '../services/supabaseSyncService';
 
 const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const distributorName = useSettingsStore(state => state.distributorName);
   const location = useLocation();
   const [isSidebarOpen, setSidebarOpen] = React.useState(true);
+  const [isSyncing, setIsSyncing] = React.useState(false);
+  const [syncSuccess, setSyncSuccess] = React.useState(false);
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    setSyncSuccess(false);
+    try {
+      const success = await SupabaseSyncService.syncAll();
+      if (success) {
+        setSyncSuccess(true);
+        setTimeout(() => setSyncSuccess(false), 3000);
+      } else {
+        alert("Error al sincronizar con Supabase.");
+      }
+    } catch (err: any) {
+      alert(`Error de red: ${err?.message || err}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
@@ -104,6 +126,26 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               {menuItems.find(m => m.path === location.pathname)?.label || 'Admin'}
             </h2>
             <div className="flex items-center gap-4">
+               {/* Cloud Sync Button */}
+               <button
+                 onClick={handleManualSync}
+                 disabled={isSyncing}
+                 className={`
+                   p-2 rounded-xl border transition-all flex items-center gap-2 cursor-pointer
+                   ${isSyncing 
+                     ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
+                     : syncSuccess 
+                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                       : 'bg-brand-charcoal/40 border-brand-charcoal/80 text-brand-steel hover:text-brand-smoke hover:bg-brand-charcoal'}
+                 `}
+                 title="Sincronizar datos con la nube (Supabase)"
+               >
+                 <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                 <span className="text-[10px] font-bold uppercase tracking-wider hidden md:inline">
+                   {isSyncing ? 'Actualizando...' : syncSuccess ? '¡Sincronizado!' : 'Sincronizar'}
+                 </span>
+               </button>
+
                <div className="text-right hidden sm:block">
                  <div className="text-sm font-bold">Admin {distributorName}</div>
                  <div className="text-[10px] text-brand-gold uppercase font-bold tracking-tighter">Super Admin</div>

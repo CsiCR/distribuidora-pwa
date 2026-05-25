@@ -321,6 +321,9 @@ export const useOfflineSalesStore = create<OfflineSalesState>()(
               observations: `Venta de Recreo. Modo de cobro: ${order.payment_method}`
             });
           });
+
+          // Wait 1.2 seconds for individual background sync orders to settle
+          await new Promise(resolve => setTimeout(resolve, 1200));
         }
         
         // Push all updated local caches (stocks, client balances, transactions, audit logs) to Supabase
