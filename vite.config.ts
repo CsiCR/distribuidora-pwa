@@ -27,35 +27,16 @@ export default defineConfig({
             }
             
             try {
-              // 1. Fetch main search page to extract VQD token
-              const tokenRes = await fetch(`https://duckduckgo.com/?q=${encodeURIComponent(query)}`, {
+              // 1. Fetch main search page to extract VQD token (using html.duckduckgo.com to prevent bot blocks)
+              const tokenRes = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
                 headers: {
                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                 }
               });
               const tokenHtml = await tokenRes.text();
               
-              // Extract VQD token using regexes with optional spaces support
-              let vqd = '';
-              const match1 = tokenHtml.match(/vqd=(['"])([^'"]+)\1/);
-              if (match1) {
-                vqd = match1[2];
-              } else {
-                const match2 = tokenHtml.match(/vqd:\s*(['"])([^'"]+)\1/);
-                if (match2) {
-                  vqd = match2[2];
-                } else {
-                  const match3 = tokenHtml.match(/vqd\s*=\s*(['"])([^'"]+)\1/);
-                  if (match3) {
-                    vqd = match3[2];
-                  } else {
-                    const match4 = tokenHtml.match(/vqd\s*=\s*([^;,\s"']+)/);
-                    if (match4) {
-                      vqd = match4[1].trim();
-                    }
-                  }
-                }
-              }
+              const match = tokenHtml.match(/name="vqd"\s+value="([^"]+)"/);
+              const vqd = match ? match[1] : '';
 
               if (!vqd) {
                 res.statusCode = 500;
