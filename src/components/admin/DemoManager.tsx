@@ -10,6 +10,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useTerminalStore } from '../../store/useTerminalStore';
 import { useProvidersStore } from '../../store/useProvidersStore';
 import { useCartStore } from '../../store/useCartStore';
+import { useConsignmentsStore } from '../../store/useConsignmentsStore';
 import { seedProfiles } from '../../data/seedProfiles';
 import { cn } from '../../lib/utils';
 import { generateDemoData } from '../../utils/demoDataGenerator';
@@ -31,6 +32,7 @@ export const DemoManager: React.FC = () => {
   const { clearTerminal } = useTerminalStore();
   const { clearStore: clearProviders, setProvidersData } = useProvidersStore();
   const { clearCart } = useCartStore();
+  const { clearStore: clearConsignments, seedDemoConsignments } = useConsignmentsStore();
   
   const distributorName = useSettingsStore(state => state.distributorName);
   const setDistributorName = useSettingsStore(state => state.setDistributorName);
@@ -50,6 +52,7 @@ export const DemoManager: React.FC = () => {
       clearTerminal();
       clearProviders();
       clearCart();
+      clearConsignments();
       alert('Sistema reiniciado a cero en local y en Supabase.');
     }
   };
@@ -71,6 +74,7 @@ export const DemoManager: React.FC = () => {
       clearTerminal();
       clearProviders();
       clearCart();
+      clearConsignments();
       
       // 3. Hydrate Local Stores with Seed Data
       setProducts(demoData.products);
@@ -78,6 +82,7 @@ export const DemoManager: React.FC = () => {
       setProvidersData(demoData.providers, demoData.providerInvoices, demoData.providerPayments);
       setOrders(demoData.orders);
       setTransactions(demoData.transactions);
+      seedDemoConsignments(demoData.products);
 
       // 4. Batch Upload Seed Data to Supabase
       await SupabaseSyncService.pushAllLocalData();

@@ -12,7 +12,8 @@ import {
   AlertCircle, 
   Check, 
   ArrowRightLeft, 
-  Search
+  Search,
+  Edit
 } from 'lucide-react';
 import { useConsignmentsStore, type Seller } from '../../store/useConsignmentsStore';
 import { useStockStore } from '../../store/useStockStore';
@@ -23,6 +24,7 @@ export const ConsignmentsManagement: React.FC = () => {
     sellers, 
     consignedProducts, 
     addSeller, 
+    updateSeller,
     deleteSeller, 
     addConsignment, 
     updateConsignment, 
@@ -47,6 +49,14 @@ export const ConsignmentsManagement: React.FC = () => {
   const [sellerName, setSellerName] = useState('');
   const [sellerPhone, setSellerPhone] = useState('');
   const [sellerEmail, setSellerEmail] = useState('');
+
+  // Edit Seller Form State
+  const [showEditSellerModal, setShowEditSellerModal] = useState(false);
+  const [editingSeller, setEditingSeller] = useState<Seller | null>(null);
+  const [editSellerName, setEditSellerName] = useState('');
+  const [editSellerPhone, setEditSellerPhone] = useState('');
+  const [editSellerEmail, setEditSellerEmail] = useState('');
+  const [editSellerStatus, setEditSellerStatus] = useState<'activo' | 'inactivo'>('activo');
 
   // Add Consignment Form State
   const [selectedConsignmentItems, setSelectedConsignmentItems] = useState<Array<{
@@ -99,6 +109,30 @@ export const ConsignmentsManagement: React.FC = () => {
     setSellerPhone('');
     setSellerEmail('');
     setShowAddSellerModal(false);
+  };
+
+  const handleEditSellerClick = (seller: Seller) => {
+    setEditingSeller(seller);
+    setEditSellerName(seller.name);
+    setEditSellerPhone(seller.phone);
+    setEditSellerEmail(seller.email || '');
+    setEditSellerStatus(seller.status);
+    setShowEditSellerModal(true);
+  };
+
+  const handleEditSellerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSeller || !editSellerName.trim() || !editSellerPhone.trim()) return;
+
+    updateSeller(editingSeller.id, {
+      name: editSellerName,
+      phone: editSellerPhone,
+      email: editSellerEmail,
+      status: editSellerStatus
+    });
+
+    setShowEditSellerModal(false);
+    setEditingSeller(null);
   };
 
   const handleAddConsignmentSubmit = (e: React.FormEvent) => {
@@ -291,9 +325,10 @@ export const ConsignmentsManagement: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {sellers.map(seller => {
-                const totalItemsConsigned = consignedProducts
-                  .filter(cp => cp.seller_id === seller.id)
-                  .reduce((acc, cp) => acc + cp.quantity, 0);
+                const sellerProducts = consignedProducts.filter(cp => cp.seller_id === seller.id);
+                const uniqueProductsCount = sellerProducts.length;
+                const totalUnitsConsigned = sellerProducts.reduce((acc, cp) => acc + cp.quantity, 0);
+                const totalUnitsAvailable = sellerProducts.reduce((acc, cp) => acc + (cp.quantity - cp.stock_sold - cp.stock_returned), 0);
 
                 return (
                   <div key={seller.id} className="glass-card border-brand-charcoal p-5 space-y-4 hover:border-brand-gold/40 transition-colors relative flex flex-col justify-between">
@@ -318,7 +353,9 @@ export const ConsignmentsManagement: React.FC = () => {
                         {seller.email && <p className="flex items-center gap-2"><Mail size={12} className="text-brand-gold" /> {seller.email}</p>}
                         <p className="flex items-center gap-2">
                           <ShoppingBag size={12} className="text-brand-gold" /> 
-                          Productos Consignados: <span className="text-white font-bold">{totalItemsConsigned}</span>
+                          Productos Consignados: <span className="text-white font-bold">
+                            {uniqueProductsCount} {uniqueProductsCount === 1 ? 'prod.' : 'prods.'} ({totalUnitsAvailable} u. de {totalUnitsConsigned})
+                          </span>
                         </p>
                       </div>
 
@@ -374,6 +411,13 @@ export const ConsignmentsManagement: React.FC = () => {
                         title="Descargar CSV Manual"
                       >
                         <Download size={14} />
+                      </button>
+                      <button 
+                        onClick={() => handleEditSellerClick(seller)}
+                        className="p-2 bg-brand-charcoal border border-brand-charcoal rounded-xl text-brand-steel hover:text-white hover:border-brand-gold transition-colors cursor-pointer"
+                        title="Editar Ficha"
+                      >
+                        <Edit size={14} />
                       </button>
                       <button 
                         onClick={() => { if(confirm('¿Eliminar vendedor y todas sus consignaciones?')) deleteSeller(seller.id); }}
@@ -701,6 +745,82 @@ export const ConsignmentsManagement: React.FC = () => {
                 className="w-full btn-gold py-3 rounded-xl font-black uppercase tracking-widest text-xs mt-2"
               >
                 Guardar Registro
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Seller Modal */}
+      {showEditSellerModal && editingSeller && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-brand-black/80 backdrop-blur-sm" onClick={() => { setShowEditSellerModal(false); setEditingSeller(null); }} />
+          <div className="glass-card w-full max-w-md p-0 relative z-10 border-brand-gold/30 overflow-hidden shadow-2xl animate-scale-up">
+            <div className="bg-brand-gold/10 px-6 py-4 border-b border-brand-gold/20 flex justify-between items-center">
+              <h3 className="text-lg font-display font-bold flex items-center gap-2 text-white">
+                <Edit size={18} className="text-brand-gold" /> Modificar Vendedor
+              </h3>
+              <button 
+                onClick={() => { setShowEditSellerModal(false); setEditingSeller(null); }} 
+                className="p-1 hover:bg-brand-gold/20 rounded-full text-brand-steel hover:text-white transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <form onSubmit={handleEditSellerSubmit} className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase font-black text-brand-steel tracking-widest block mb-1">Nombre Completo</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-brand-black border border-brand-charcoal rounded-xl px-4 py-2.5 text-sm text-white focus:border-brand-gold outline-none transition-all" 
+                  value={editSellerName}
+                  onChange={e => setEditSellerName(e.target.value)}
+                  placeholder="Ej: Juan Pérez"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase font-black text-brand-steel tracking-widest block mb-1">Teléfono (WhatsApp)</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-brand-black border border-brand-charcoal rounded-xl px-4 py-2.5 text-sm text-white focus:border-brand-gold outline-none transition-all" 
+                  value={editSellerPhone}
+                  onChange={e => setEditSellerPhone(e.target.value)}
+                  placeholder="Ej: +54 9 11 2222-3333"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase font-black text-brand-steel tracking-widest block mb-1">Email (Opcional)</label>
+                <input 
+                  type="email" 
+                  className="w-full bg-brand-black border border-brand-charcoal rounded-xl px-4 py-2.5 text-sm text-white focus:border-brand-gold outline-none transition-all" 
+                  value={editSellerEmail}
+                  onChange={e => setEditSellerEmail(e.target.value)}
+                  placeholder="Ej: juan.perez@email.com"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase font-black text-brand-steel tracking-widest block mb-1">Estado</label>
+                <select 
+                  className="w-full bg-brand-black border border-brand-charcoal rounded-xl px-4 py-2.5 text-sm text-white focus:border-brand-gold outline-none transition-all" 
+                  value={editSellerStatus}
+                  onChange={e => setEditSellerStatus(e.target.value as 'activo' | 'inactivo')}
+                >
+                  <option value="activo" className="bg-brand-black">Activo</option>
+                  <option value="inactivo" className="bg-brand-black">Inactivo</option>
+                </select>
+              </div>
+
+              <button 
+                type="submit" 
+                className="w-full btn-gold py-3 rounded-xl font-black uppercase tracking-widest text-xs mt-2"
+              >
+                Actualizar Ficha
               </button>
             </form>
           </div>

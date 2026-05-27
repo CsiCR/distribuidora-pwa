@@ -33,6 +33,8 @@ interface ConsignmentsState {
   updateConsignment: (id: string, updates: Partial<ConsignedProduct>) => void;
   deleteConsignment: (id: string) => void;
   syncFeedFile: (sellerId: string, csvContent: string) => Promise<string | null>;
+  clearStore: () => void;
+  seedDemoConsignments: (products: any[]) => void;
 }
 
 export const useConsignmentsStore = create<ConsignmentsState>()(
@@ -40,6 +42,7 @@ export const useConsignmentsStore = create<ConsignmentsState>()(
     (set, get) => ({
       sellers: [],
       consignedProducts: [],
+      clearStore: () => set({ sellers: [], consignedProducts: [] }),
       
       addSeller: (sellerData) => set((state) => {
         const newSeller: Seller = {
@@ -135,7 +138,79 @@ export const useConsignmentsStore = create<ConsignmentsState>()(
           console.error('Error syncing feed file:', err);
           return null;
         }
-      }
+      },
+
+      seedDemoConsignments: (products) => set(() => {
+        const sellerId1 = 'sel-mx1ac6q';
+        const sellerId2 = 'sel-brenda';
+        
+        const demoSellers: Seller[] = [
+          {
+            id: sellerId1,
+            name: 'Adrián',
+            phone: '+5492975131896',
+            email: 'infocsicr@gmail.com',
+            status: 'activo',
+            created_at: new Date().toLocaleString(),
+            feed_url: 'https://rvnsclqmjyirocyvwfie.supabase.co/storage/v1/object/public/feeds/seller-sel-mx1ac6q.csv'
+          },
+          {
+            id: sellerId2,
+            name: 'Brenda Promotora',
+            phone: '+5491122334455',
+            email: 'brenda@demo.com',
+            status: 'activo',
+            created_at: new Date().toLocaleString()
+          }
+        ];
+
+        // Seed consigned products using the products list if available
+        const demoConsigned: ConsignedProduct[] = [];
+        if (products.length >= 2) {
+          // Consign to Adrián:
+          // Product 1: 15 consigned, 5 sold, 2 returned => 8 available
+          demoConsigned.push({
+            id: 'con-demo1',
+            seller_id: sellerId1,
+            product_id: products[0].id,
+            price: products[0].prices.Minorista,
+            quantity: 15,
+            stock_sold: 5,
+            stock_returned: 2,
+            last_update: new Date().toLocaleString()
+          });
+          // Product 2: 10 consigned, 3 sold, 0 returned => 7 available
+          // Total available = 8 + 7 = 15 u.
+          demoConsigned.push({
+            id: 'con-demo2',
+            seller_id: sellerId1,
+            product_id: products[1].id,
+            price: products[1].prices.Minorista,
+            quantity: 10,
+            stock_sold: 3,
+            stock_returned: 0,
+            last_update: new Date().toLocaleString()
+          });
+
+          // Consign to Brenda:
+          // Product 1: 5 consigned, 1 sold, 0 returned => 4 available
+          demoConsigned.push({
+            id: 'con-demo3',
+            seller_id: sellerId2,
+            product_id: products[0].id,
+            price: products[0].prices.Minorista,
+            quantity: 5,
+            stock_sold: 1,
+            stock_returned: 0,
+            last_update: new Date().toLocaleString()
+          });
+        }
+
+        return {
+          sellers: demoSellers,
+          consignedProducts: demoConsigned
+        };
+      })
     }),
     {
       name: 'consignments-storage'
