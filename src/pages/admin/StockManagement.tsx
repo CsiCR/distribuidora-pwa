@@ -17,10 +17,12 @@ import {
   List,
   LayoutGrid,
   Image as ImageIcon,
-  Trash2
+  Trash2,
+  Camera
 } from 'lucide-react';
 import { ProductImage } from '../../components/ProductImage';
 import { ImageSearchModal } from '../../components/admin/ImageSearchModal';
+import { BarcodeScannerModal } from '../../components/admin/BarcodeScannerModal';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -367,6 +369,22 @@ Devuelve SOLAMENTE el objeto JSON válido. No incluyas explicaciones.`;
     alert(`¡Producto "${newProdItem.name}" registrado e ingresado con éxito!`);
   };
 
+  const handleMainScanSuccess = (code: string) => {
+    setSearchTerm(code);
+  };
+
+  const handleEditScanSuccess = (code: string) => {
+    setEditBarcode(code);
+  };
+
+  const handleNewScanSuccess = (code: string) => {
+    setNewProdData(prev => ({
+      ...prev,
+      barcode: code,
+      sku: prev.sku || (code ? `SKU-${code.substring(code.length - 4)}` : '')
+    }));
+  };
+
   useEffect(() => {
     if (selectedItem) {
       setAdjustmentInPacks(selectedItem.units_per_box > 1);
@@ -454,6 +472,9 @@ Devuelve SOLAMENTE el objeto JSON válido. No incluyas explicaciones.`;
   const [editObservations, setEditObservations] = useState('');
   const [editImageUrl, setEditImageUrl] = useState('');
   const [isImageSearchModalOpen, setIsImageSearchModalOpen] = useState(false);
+  const [isMainScannerOpen, setIsMainScannerOpen] = useState(false);
+  const [isEditBarcodeScannerOpen, setIsEditBarcodeScannerOpen] = useState(false);
+  const [isNewBarcodeScannerOpen, setIsNewBarcodeScannerOpen] = useState(false);
   
 
 
@@ -756,7 +777,14 @@ Devuelve SOLAMENTE el objeto JSON válido. No incluyas explicaciones.`;
         <div className="flex flex-col lg:flex-row gap-4 items-center">
           <div className="relative flex-1 w-full">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-steel" size={20} />
-            <input type="text" placeholder="Buscar por Nombre, SKU o Código de Barras..." className="w-full bg-brand-black/50 border border-brand-charcoal rounded-xl pl-12 pr-4 py-3 text-brand-smoke focus:border-brand-gold outline-none transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <input type="text" placeholder="Buscar por Nombre, SKU o Código de Barras..." className="w-full bg-brand-black/50 border border-brand-charcoal rounded-xl pl-12 pr-12 py-3 text-brand-smoke focus:border-brand-gold outline-none transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <button
+              onClick={() => setIsMainScannerOpen(true)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-brand-charcoal text-brand-steel hover:text-brand-gold rounded-lg transition-colors cursor-pointer"
+              title="Escanear con Cámara"
+            >
+              <Camera size={20} />
+            </button>
           </div>
           <div className="flex bg-brand-charcoal p-1 rounded-xl">
             <button 
@@ -1358,8 +1386,16 @@ Devuelve SOLAMENTE el objeto JSON válido. No incluyas explicaciones.`;
                     <label className="text-[9px] font-bold text-brand-steel uppercase mb-1 block">Código de Barras (EAN/UPC)</label>
                     <div className="flex gap-2">
                       <div className="relative flex-1">
-                        <input className="w-full input-field pl-10 text-xs font-mono" value={editBarcode} onChange={(e) => setEditBarcode(e.target.value)} placeholder="Esperando escaneo..." />
+                        <input className="w-full input-field pl-10 pr-10 text-xs font-mono" value={editBarcode} onChange={(e) => setEditBarcode(e.target.value)} placeholder="Esperando escaneo..." />
                         <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-steel" size={16} />
+                        <button
+                          type="button"
+                          onClick={() => setIsEditBarcodeScannerOpen(true)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-brand-charcoal text-brand-steel hover:text-brand-gold rounded transition-colors cursor-pointer"
+                          title="Escanear con Cámara"
+                        >
+                          <Camera size={16} />
+                        </button>
                       </div>
                       <button 
                         type="button"
@@ -1552,20 +1588,30 @@ Devuelve SOLAMENTE el objeto JSON válido. No incluyas explicaciones.`;
                   <div className="space-y-1">
                     <label className="text-[9px] uppercase font-bold text-brand-steel tracking-wider">Código de Barras</label>
                     <div className="flex gap-2">
-                      <input 
-                        type="text" 
-                        placeholder="Código de barras..." 
-                        className="flex-1 bg-brand-charcoal border border-brand-charcoal rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-brand-gold"
-                        value={newProdData.barcode}
-                        onChange={(e) => {
-                          const bc = e.target.value;
-                          setNewProdData(prev => ({ 
-                            ...prev, 
-                            barcode: bc,
-                            sku: prev.sku || (bc ? `SKU-${bc.substring(bc.length - 4)}` : '')
-                          }));
-                        }}
-                      />
+                      <div className="relative flex-1">
+                        <input 
+                          type="text" 
+                          placeholder="Código de barras..." 
+                          className="w-full bg-brand-charcoal border border-brand-charcoal rounded-xl pl-3 pr-10 py-2 text-xs text-white outline-none focus:border-brand-gold"
+                          value={newProdData.barcode}
+                          onChange={(e) => {
+                            const bc = e.target.value;
+                            setNewProdData(prev => ({ 
+                              ...prev, 
+                              barcode: bc,
+                              sku: prev.sku || (bc ? `SKU-${bc.substring(bc.length - 4)}` : '')
+                            }));
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setIsNewBarcodeScannerOpen(true)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-brand-black/30 text-brand-steel hover:text-brand-gold rounded transition-colors cursor-pointer"
+                          title="Escanear con Cámara"
+                        >
+                          <Camera size={14} />
+                        </button>
+                      </div>
                       <button
                         type="button"
                         onClick={handleBarcodeLookup}
@@ -2437,6 +2483,24 @@ Devuelve SOLAMENTE el objeto JSON válido. No incluyas explicaciones.`;
         </div>
       </div>
       {isAuditOpen && <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[190]" onClick={() => setIsAuditOpen(false)} />}
+
+      <BarcodeScannerModal 
+        isOpen={isMainScannerOpen} 
+        onClose={() => setIsMainScannerOpen(false)} 
+        onScanSuccess={handleMainScanSuccess} 
+      />
+
+      <BarcodeScannerModal 
+        isOpen={isEditBarcodeScannerOpen} 
+        onClose={() => setIsEditBarcodeScannerOpen(false)} 
+        onScanSuccess={handleEditScanSuccess} 
+      />
+
+      <BarcodeScannerModal 
+        isOpen={isNewBarcodeScannerOpen} 
+        onClose={() => setIsNewBarcodeScannerOpen(false)} 
+        onScanSuccess={handleNewScanSuccess} 
+      />
     </div>
   );
 };

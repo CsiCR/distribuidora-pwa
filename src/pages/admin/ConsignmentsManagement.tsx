@@ -13,11 +13,13 @@ import {
   Check, 
   ArrowRightLeft, 
   Search,
-  Edit
+  Edit,
+  Camera
 } from 'lucide-react';
 import { useConsignmentsStore, type Seller } from '../../store/useConsignmentsStore';
 import { useStockStore } from '../../store/useStockStore';
 import { cn } from '../../lib/utils';
+import { BarcodeScannerModal } from '../../components/admin/BarcodeScannerModal';
 
 export const ConsignmentsManagement: React.FC = () => {
   const { 
@@ -41,6 +43,7 @@ export const ConsignmentsManagement: React.FC = () => {
   // Modals state
   const [showAddSellerModal, setShowAddSellerModal] = useState(false);
   const [showAddConsignmentModal, setShowAddConsignmentModal] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<{ text: string; type: 'success' | 'error' | null }>({ text: '', type: null });
@@ -133,6 +136,33 @@ export const ConsignmentsManagement: React.FC = () => {
 
     setShowEditSellerModal(false);
     setEditingSeller(null);
+  };
+
+  const handleScanSuccess = (code: string) => {
+    const matched = products.find(p => 
+      (p.barcode && p.barcode.trim() === code) || 
+      p.sku.trim().toLowerCase() === code.toLowerCase()
+    );
+
+    if (matched) {
+      const isAdded = selectedConsignmentItems.some(item => item.product.id === matched.id);
+      if (isAdded) {
+        alert('Este producto ya está en la lista de asignación.');
+        return;
+      }
+      setSelectedConsignmentItems(prev => [
+        ...prev,
+        {
+          product: matched,
+          price: matched.prices.Minorista,
+          quantity: 1
+        }
+      ]);
+      setProductSearch('');
+    } else {
+      setProductSearch(code);
+      alert(`No se encontró ningún producto con el código: "${code}"`);
+    }
   };
 
   const handleAddConsignmentSubmit = (e: React.FormEvent) => {
@@ -852,11 +882,19 @@ export const ConsignmentsManagement: React.FC = () => {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-steel" size={14} />
                   <input 
                     type="text" 
-                    className="w-full bg-brand-black border border-brand-charcoal rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:border-brand-gold outline-none transition-all" 
+                    className="w-full bg-brand-black border border-brand-charcoal rounded-xl pl-9 pr-9 py-2 text-xs text-white focus:border-brand-gold outline-none transition-all" 
                     placeholder="Filtrar por SKU, nombre, marca..." 
                     value={productSearch}
                     onChange={e => setProductSearch(e.target.value)}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setIsScannerOpen(true)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-brand-charcoal text-brand-steel hover:text-brand-gold rounded transition-colors cursor-pointer"
+                    title="Escanear con Cámara"
+                  >
+                    <Camera size={14} />
+                  </button>
                 </div>
                 
                 {filteredProducts.length > 0 && (
@@ -991,6 +1029,11 @@ export const ConsignmentsManagement: React.FC = () => {
           </div>
         </div>
       )}
+      <BarcodeScannerModal 
+        isOpen={isScannerOpen} 
+        onClose={() => setIsScannerOpen(false)} 
+        onScanSuccess={handleScanSuccess} 
+      />
     </div>
   );
 };

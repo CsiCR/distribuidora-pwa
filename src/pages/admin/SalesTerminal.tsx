@@ -14,10 +14,12 @@ import {
   Play,
   List,
   LayoutGrid,
-  Printer
+  Printer,
+  Camera
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { ProductImage } from '../../components/ProductImage';
+import { BarcodeScannerModal } from '../../components/admin/BarcodeScannerModal';
 import { useOrdersStore } from '../../store/useOrdersStore';
 import { useClientsStore } from '../../store/useClientsStore';
 import { useStockStore, WAREHOUSES } from '../../store/useStockStore';
@@ -47,6 +49,7 @@ const SalesTerminal: React.FC = () => {
 
   const [isParkedDrawerOpen, setIsParkedDrawerOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const invoicePrintRef = useRef<HTMLDivElement>(null);
   
@@ -417,6 +420,25 @@ const SalesTerminal: React.FC = () => {
     }
   };
 
+  const handleScanSuccess = (code: string) => {
+    const matchedProduct = products.find(p => 
+      p.status === 'activo' && 
+      (warehouseFilter === 'all' || p.warehouse === warehouseFilter) &&
+      (
+        (p.barcode && p.barcode.trim() === code) || 
+        p.sku.trim().toLowerCase() === code.toLowerCase()
+      )
+    );
+
+    if (matchedProduct) {
+      addToCart(matchedProduct);
+      setSearchTerm('');
+    } else {
+      setSearchTerm(code);
+      alert(`No se encontró ningún producto con el código: "${code}"`);
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-140px)] gap-6 animate-fade-in relative">
       
@@ -711,11 +733,18 @@ const SalesTerminal: React.FC = () => {
             <input 
               type="text" 
               placeholder="Escanear código o buscar producto..." 
-              className="w-full bg-brand-black/50 border border-brand-charcoal rounded-xl pl-12 pr-4 py-3 text-brand-smoke focus:border-brand-gold outline-none transition-all"
+              className="w-full bg-brand-black/50 border border-brand-charcoal rounded-xl pl-12 pr-12 py-3 text-brand-smoke focus:border-brand-gold outline-none transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={handleSearchKeyDown}
             />
+            <button
+              onClick={() => setIsScannerOpen(true)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-brand-charcoal text-brand-steel hover:text-brand-gold rounded-lg transition-colors cursor-pointer"
+              title="Escanear con Cámara"
+            >
+              <Camera size={20} />
+            </button>
           </div>
           <div className="flex bg-brand-charcoal p-1 rounded-xl">
             <button 
@@ -1230,6 +1259,12 @@ const SalesTerminal: React.FC = () => {
         </div>
       </div>
       {isParkedDrawerOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[290]" onClick={() => setIsParkedDrawerOpen(false)} />}
+
+      <BarcodeScannerModal 
+        isOpen={isScannerOpen} 
+        onClose={() => setIsScannerOpen(false)} 
+        onScanSuccess={handleScanSuccess} 
+      />
     </div>
   );
 };
