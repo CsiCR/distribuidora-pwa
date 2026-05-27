@@ -312,13 +312,9 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
     }
   };
 
-  // Handle local file load, canvas WebP conversion, and assign
-  const handleLocalFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processImageFile = (file: File, isPasted: boolean = false) => {
     setIsProcessing(true);
-    setProcessingStatus('Procesando y convirtiendo foto local a WebP...');
+    setProcessingStatus(isPasted ? 'Procesando y convirtiendo imagen del portapapeles a WebP...' : 'Procesando y convirtiendo foto local a WebP...');
     setError(null);
     const reader = new FileReader();
 
@@ -361,7 +357,7 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
       };
 
       img.onerror = () => {
-        setError('El archivo seleccionado no es una imagen válida.');
+        setError(isPasted ? 'La imagen pegada no tiene un formato válido.' : 'El archivo seleccionado no es una imagen válida.');
         setIsProcessing(false);
       };
 
@@ -369,12 +365,67 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
     };
 
     reader.onerror = () => {
-      setError('Error al leer el archivo local.');
+      setError(isPasted ? 'Error al leer la imagen pegada.' : 'Error al leer el archivo local.');
       setIsProcessing(false);
     };
 
     reader.readAsDataURL(file);
   };
+
+  // Handle local file load, canvas WebP conversion, and assign
+  const handleLocalFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processImageFile(file, false);
+    }
+  };
+
+  // Clipboard paste listener to allow pasting copied images directly (either binary or URL)
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (!isOpen || isProcessing) return;
+      
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      
+      // Check if user is typing in a text field
+      const activeEl = document.activeElement;
+      const isTextInput = activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.getAttribute('contenteditable') === 'true'
+      );
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            processImageFile(file, true);
+            break;
+          }
+        } else if (item.type === 'text/plain' && !isTextInput) {
+          // If they pasted a URL instead of a binary file, and they are not focusing an input field
+          const text = e.clipboardData.getData('text');
+          const url = text ? text.trim() : '';
+          if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:image/')) {
+            e.preventDefault();
+            processPastedUrl(url);
+          }
+        }
+      }
+    };
+    
+    const processPastedUrl = async (url: string) => {
+      await processImageAndConvertToWebp(url);
+    };
+    
+    window.addEventListener('paste', handlePaste);
+    return () => {
+      window.removeEventListener('paste', handlePaste);
+    };
+  }, [isOpen, isProcessing]);
 
   // Helper to convert base64 image data to optimized WebP base64 via Canvas
   const convertBase64ToWebp = (base64Data: string): Promise<string> => {
@@ -747,9 +798,9 @@ export const ImageSearchModal: React.FC<ImageSearchModalProps> = ({
                   ) : (
                     <>
                       <Upload className="mx-auto text-brand-steel mb-3" size={32} />
-                      <p className="text-xs text-brand-smoke font-bold">Haz clic aquí para seleccionar una foto</p>
+                      <p className="text-xs text-brand-smoke font-bold">Haz clic aquí para seleccionar una foto o pega una imagen directamente con Ctrl+V</p>
                       <p className="text-[10px] text-brand-steel mt-1.5 leading-relaxed">
-                        Soporta JPG, JPEG, PNG, WEBP, GIF. <br />
+                        Soporta JPG, JPEG, PNG, WEBP, GIF y pegado desde portapapeles. <br />
                         <span className="text-brand-gold/80 font-semibold">La foto se convertirá localmente a formato WebP optimizado antes de guardarse en base de datos.</span>
                       </p>
                     </>

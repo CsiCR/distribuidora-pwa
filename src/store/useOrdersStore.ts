@@ -27,8 +27,10 @@ export interface Order {
 interface OrdersStore {
   orders: Order[];
   lastOrderNumber: number;
+  lastClientOrderNumber: number;
+  lastRecessOrderNumber: number;
   addOrder: (order: Order) => void;
-  getNextOrderNumber: () => string;
+  getNextOrderNumber: (prefix: 'REM' | 'CLI' | 'REC') => string;
   updateOrderStatus: (id: string, status: Order['status'], updates?: Partial<Order>) => void;
   clearOrders: () => void;
   setOrders: (orders: Order[]) => void;
@@ -51,6 +53,8 @@ export const useOrdersStore = create<OrdersStore>()(
         }
       ],
       lastOrderNumber: 1,
+      lastClientOrderNumber: 1,
+      lastRecessOrderNumber: 1,
       addOrder: (order) => {
         // Sync to Supabase in the background
         const syncOrder = async () => {
@@ -87,14 +91,30 @@ export const useOrdersStore = create<OrdersStore>()(
         };
         syncOrder();
 
-        set((state) => ({ 
-          orders: [order, ...state.orders],
-          lastOrderNumber: state.lastOrderNumber + 1
-        }));
+        set((state) => {
+          const updates: Partial<OrdersStore> = {
+            orders: [order, ...state.orders]
+          };
+          if (order.id.startsWith('REM-')) {
+            updates.lastOrderNumber = state.lastOrderNumber + 1;
+          } else if (order.id.startsWith('CLI-')) {
+            updates.lastClientOrderNumber = state.lastClientOrderNumber + 1;
+          } else if (order.id.startsWith('REC-')) {
+            updates.lastRecessOrderNumber = state.lastRecessOrderNumber + 1;
+          }
+          return updates;
+        });
       },
-      getNextOrderNumber: () => {
-        const next = get().lastOrderNumber;
-        return `REM-${next.toString().padStart(8, '0')}`;
+      getNextOrderNumber: (prefix) => {
+        let next = 1;
+        if (prefix === 'REM') {
+          next = get().lastOrderNumber;
+        } else if (prefix === 'CLI') {
+          next = get().lastClientOrderNumber;
+        } else if (prefix === 'REC') {
+          next = get().lastRecessOrderNumber;
+        }
+        return `${prefix}-${next.toString().padStart(8, '0')}`;
       },
       updateOrderStatus: (id, status, updates) => set((state) => {
         const nextOrders = state.orders.map(o => o.id === id ? { ...o, status, ...updates } : o);
@@ -113,8 +133,36 @@ export const useOrdersStore = create<OrdersStore>()(
         }
         return { orders: nextOrders };
       }),
-      clearOrders: () => set({ orders: [], lastOrderNumber: 1 }),
-      setOrders: (orders) => set({ orders, lastOrderNumber: orders.length + 1 })
+      clearOrders: () => set({ orders: [], lastOrderNumber: 1, lastClientOrderNumber: 1, lastRecessOrderNumber: 1 }),
+      setOrders: (orders) => {
+        const parseOrderNumber = (id: string, prefix: 'REM' | 'CLI' | 'REC'): number => {
+          const match = id.match(new RegExp(`^${prefix}-(\\d+)$`));
+          return match ? parseInt(match[2], 10) : 0;
+        };
+
+        let maxRem = 0;
+        let maxCli = 0;
+        let maxRec = 0;
+        orders.forEach(o => {
+          if (o.id.startsWith('REM-')) {
+            const num = parseOrderNumber(o.id, 'REM');
+            if (num > maxRem) maxRem = num;
+          } else if (o.id.startsWith('CLI-')) {
+            const num = parseOrderNumber(o.id, 'CLI');
+            if (num > maxCli) maxCli = num;
+          } else if (o.id.startsWith('REC-')) {
+            const num = parseOrderNumber(o.id, 'REC');
+            if (num > maxRec) maxRec = num;
+          }
+        });
+
+        set({
+          orders,
+          lastOrderNumber: maxRem + 1,
+          lastClientOrderNumber: maxCli + 1,
+          lastRecessOrderNumber: maxRec + 1
+        });
+      }
     }),
     {
       name: 'cristico-orders',

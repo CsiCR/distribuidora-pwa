@@ -210,7 +210,24 @@ export const useOfflineSalesStore = create<OfflineSalesState>()(
           return acc + (price * item.quantity);
         }, 0);
         
-        const orderId = `REC-${Math.floor(100000 + Math.random() * 900000)}`;
+        const parseOrderNumber = (id: string, prefix: 'REC'): number => {
+          const match = id.match(new RegExp(`^${prefix}-(\\d+)$`));
+          return match ? parseInt(match[2], 10) : 0;
+        };
+
+        const storeLastRec = useOrdersStore.getState().lastRecessOrderNumber;
+        const offlineOrders = get().offlineOrders;
+        
+        let maxOfflineRec = 0;
+        offlineOrders.forEach(o => {
+          if (o.id.startsWith('REC-')) {
+            const num = parseOrderNumber(o.id, 'REC');
+            if (num > maxOfflineRec) maxOfflineRec = num;
+          }
+        });
+        
+        const nextRecNum = Math.max(storeLastRec, maxOfflineRec + 1);
+        const orderId = `REC-${nextRecNum.toString().padStart(8, '0')}`;
 
         let observations = '';
         if (paymentMethod === 'Mixto') {

@@ -18,7 +18,7 @@ import {
   Settings,
   Image as ImageIcon
 } from 'lucide-react';
-import { useStockStore, type Product } from '../../store/useStockStore';
+import { useStockStore, type Product, WAREHOUSES } from '../../store/useStockStore';
 import { useClientsStore, type Client } from '../../store/useClientsStore';
 import { useProvidersStore, type Provider } from '../../store/useProvidersStore';
 import { useOrdersStore, type Order } from '../../store/useOrdersStore';
@@ -26,15 +26,6 @@ import { useTransactionsStore, type Transaction } from '../../store/useTransacti
 import { cn } from '../../lib/utils';
 import { ProductImage } from '../../components/ProductImage';
 import { ImageSearchModal } from '../../components/admin/ImageSearchModal';
-
-const WAREHOUSES = [
-  'Deposito Central',
-  'Zona Norte',
-  'Zona Sur',
-  'Centro',
-  'Periferia',
-  'Interior'
-];
 
 interface Message {
   sender: 'ai' | 'user';

@@ -20,7 +20,7 @@ import { cn } from '../../lib/utils';
 import { ProductImage } from '../../components/ProductImage';
 import { useOrdersStore } from '../../store/useOrdersStore';
 import { useClientsStore } from '../../store/useClientsStore';
-import { useStockStore } from '../../store/useStockStore';
+import { useStockStore, WAREHOUSES } from '../../store/useStockStore';
 import type { Product } from '../../store/useStockStore';
 import { useParkedOrdersStore } from '../../store/useParkedOrdersStore';
 import { useTransactionsStore } from '../../store/useTransactionsStore';
@@ -30,14 +30,6 @@ import BarcodeComponent from 'react-barcode';
 import { useSettingsStore } from '../../store/useSettingsStore';
 
 // Types (reusing from Stock and Clients)
-const WAREHOUSES = [
-  'Deposito Central',
-  'Zona Norte',
-  'Zona Sur',
-  'Centro',
-  'Periferia',
-  'Interior'
-];
 
 const SalesTerminal: React.FC = () => {
   const settings = useSettingsStore();
@@ -303,7 +295,7 @@ const SalesTerminal: React.FC = () => {
       return;
     }
 
-    const orderId = getNextOrderNumber();
+    const orderId = getNextOrderNumber('REM');
     const invoiceId = getNextInvoiceNumber();
     setCurrentInvoiceNumber(invoiceId);
 

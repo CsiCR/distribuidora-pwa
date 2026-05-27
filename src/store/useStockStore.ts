@@ -3,6 +3,16 @@ import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
 import { mapAppProductToDb } from '../utils/dbMappers';
 
+export const WAREHOUSES = [
+  'Deposito Central',
+  'Zona Norte',
+  'Zona Sur',
+  'Centro',
+  'Periferia',
+  'Interior',
+  'Recreo'
+];
+
 export type Product = {
   id: string;
   sku: string;

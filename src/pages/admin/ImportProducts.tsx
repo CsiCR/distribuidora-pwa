@@ -9,7 +9,7 @@ import {
   Trash2,
   Save
 } from 'lucide-react';
-import { useStockStore } from '../../store/useStockStore';
+import { useStockStore, WAREHOUSES } from '../../store/useStockStore';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -46,8 +46,6 @@ interface ImportItem {
   status: 'nuevo' | 'actualizar' | 'sin_cambios' | 'error' | 'duplicado';
   errors?: string[];
 }
-
-const WAREHOUSES = ['Deposito Central', 'Zona Norte', 'Zona Sur', 'Centro'];
 
 const ImportProducts: React.FC = () => {
   const [items, setItems] = useState<ImportItem[]>([]);

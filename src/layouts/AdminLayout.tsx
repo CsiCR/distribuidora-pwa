@@ -15,7 +15,8 @@ import {
   Bot,
   Truck,
   Zap,
-  RefreshCw
+  RefreshCw,
+  ShoppingBag
 } from 'lucide-react';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { SupabaseSyncService } from '../services/supabaseSyncService';
@@ -55,6 +56,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { icon: Package, label: 'Gestión de Stock', path: '/admin/stock' },
     { icon: Users, label: 'Clientes', path: '/admin/clientes' },
     { icon: Truck, label: 'Proveedores', path: '/admin/proveedores' },
+    { icon: ShoppingBag, label: 'Consignaciones', path: '/admin/consignaciones' },
     { icon: Bot, label: 'Copiloto IA', path: '/admin/copiloto' },
     { icon: Settings, label: 'Configuración', path: '/admin/configuracion' },
   ];

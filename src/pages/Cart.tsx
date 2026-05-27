@@ -50,7 +50,7 @@ const Cart: React.FC = () => {
   const handleConfirmOrder = () => {
     if (!clientData.name || items.length === 0) return;
 
-    const orderId = getNextOrderNumber();
+    const orderId = getNextOrderNumber('CLI');
     setPlacedOrderId(orderId);
     
     const clientList = client?.price_list || 'Minorista';

@@ -15,6 +15,7 @@ import OrdersManagement from './pages/admin/OrdersManagement'
 import { Copilot } from './pages/admin/Copilot'
 import SettingsManagement from './pages/admin/SettingsManagement'
 import RecessTerminal from './pages/admin/RecessTerminal'
+import { ConsignmentsManagement } from './pages/admin/ConsignmentsManagement'
 import { DemoManager } from './components/admin/DemoManager'
 import { SupabaseSyncService } from './services/supabaseSyncService'
 
@@ -64,6 +65,7 @@ function App() {
           <Route path="/admin/pedidos" element={<AdminLayout><OrdersManagement /></AdminLayout>} />
           <Route path="/admin/copiloto" element={<AdminLayout><Copilot /></AdminLayout>} />
           <Route path="/admin/configuracion" element={<AdminLayout><SettingsManagement /></AdminLayout>} />
+          <Route path="/admin/consignaciones" element={<AdminLayout><ConsignmentsManagement /></AdminLayout>} />
           
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/catalogo" replace />} />

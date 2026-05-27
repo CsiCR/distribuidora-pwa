@@ -21,14 +21,13 @@ import {
 import { cn } from '../../lib/utils';
 import { useProvidersStore } from '../../store/useProvidersStore';
 import type { Provider, ProviderInvoice, ProviderPayment } from '../../store/useProvidersStore';
-import { useStockStore } from '../../store/useStockStore';
+import { useStockStore, WAREHOUSES } from '../../store/useStockStore';
 import type { Product } from '../../store/useStockStore';
 import { useReactToPrint } from 'react-to-print';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import BarcodeComponent from 'react-barcode';
 
 const TAX_CONDITIONS = ['Responsable Inscripto', 'Monotributista', 'Exento'] as const;
-const WAREHOUSES = ['Deposito Central', 'Zona Norte', 'Zona Sur', 'Centro'];
 const IVA_RATES = [21, 10.5, 0] as const;
 
 export const ProvidersManagement: React.FC = () => {

@@ -384,21 +384,22 @@ const RecessTerminal: React.FC = () => {
     );
   };
 
-  // Dynamically compute categories based on actual active products
+  // Dynamically compute categories based on actual active products in 'Recreo' warehouse
   const categories = useMemo(() => {
     const cats = new Set<string>();
     products.forEach(p => {
-      if (p.status === 'activo' && p.category) {
+      if (p.status === 'activo' && p.category && p.warehouse === 'Recreo') {
         cats.add(p.category);
       }
     });
     return ['Todos', ...Array.from(cats)];
   }, [products]);
 
-  // Filter products for school quick canteen
+  // Filter products for school quick canteen (only from 'Recreo' warehouse)
   const schoolProducts = useMemo(() => {
     return products.filter(p => {
       if (p.status === 'inactivo') return false;
+      if (p.warehouse !== 'Recreo') return false;
       if (activeCategory === 'Todos') return true;
       return p.category === activeCategory;
     });
