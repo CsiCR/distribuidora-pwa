@@ -181,10 +181,7 @@ Devuelve SOLAMENTE el objeto JSON válido. No incluyas explicaciones.`;
             {
               google_search: {}
             }
-          ],
-          generationConfig: {
-            responseMimeType: "application/json"
-          }
+          ]
         })
       });
 
