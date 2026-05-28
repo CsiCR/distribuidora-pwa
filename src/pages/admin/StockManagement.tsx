@@ -179,7 +179,7 @@ Devuelve SOLAMENTE el objeto JSON válido. No incluyas explicaciones.`;
           ],
           tools: [
             {
-              googleSearch: {}
+              google_search: {}
             }
           ],
           generationConfig: {
